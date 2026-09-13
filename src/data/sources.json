@@ -254,5 +254,197 @@
     "version": "2.20.0",
     "checked": "2026-09-13",
     "kind": "官方代码与发布"
+  },
+  {
+    "id": "hf-generation",
+    "title": "Transformers：文本生成",
+    "url": "https://huggingface.co/docs/transformers/main/en/llm_tutorial",
+    "version": "机制说明；滚动文档，不作为未锁定依赖的安装指令",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "hf-cache",
+    "title": "Transformers：KV 缓存机制",
+    "url": "https://huggingface.co/docs/transformers/main/en/cache_explanation",
+    "version": "机制说明；滚动文档，不作为未锁定依赖的安装指令",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "embedding",
+    "title": "PyTorch：Embedding 查表操作",
+    "url": "https://docs.pytorch.org/docs/2.14/generated/torch.nn.Embedding.html",
+    "version": "机制说明；滚动文档，不作为未锁定依赖的安装指令",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "autograd",
+    "title": "PyTorch 自动求导",
+    "url": "https://docs.pytorch.org/tutorials/beginner/basics/autogradqs_tutorial.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "amp",
+    "title": "PyTorch 混合精度训练",
+    "url": "https://docs.pytorch.org/tutorials/recipes/recipes/amp_recipe.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "fsdp",
+    "title": "PyTorch FSDP2 入门",
+    "url": "https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "lora",
+    "title": "PEFT LoRA 概念",
+    "url": "https://huggingface.co/docs/peft/main/en/conceptual_guides/lora",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "qwen",
+    "title": "Qwen3-0.6B 官方模型卡",
+    "url": "https://huggingface.co/Qwen/Qwen3-0.6B",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "checkpoint",
+    "title": "PyTorch 分布式检查点",
+    "url": "https://docs.pytorch.org/docs/2.14/distributed.checkpoint.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "triton",
+    "title": "Triton 官方算子教程",
+    "url": "https://triton-lang.org/main/getting-started/tutorials/index.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "nsight",
+    "title": "Nsight Systems 使用指南",
+    "url": "https://docs.nvidia.com/nsight-systems/UserGuide/index.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "kueue",
+    "title": "Kueue 概念",
+    "url": "https://kueue.sigs.k8s.io/docs/concepts/",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "data",
+    "title": "PyTorch 数据加载",
+    "url": "https://docs.pytorch.org/docs/2.14/data.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "ddp",
+    "title": "PyTorch DDP 教程",
+    "url": "https://docs.pytorch.org/tutorials/intermediate/ddp_tutorial.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "compile-basics",
+    "title": "torch.compile 介绍",
+    "url": "https://docs.pytorch.org/tutorials/intermediate/torch_compile_tutorial.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "quantization",
+    "title": "vLLM：量化与硬件支持",
+    "url": "https://docs.vllm.ai/en/latest/features/quantization/",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "speculative",
+    "title": "vLLM：推测解码",
+    "url": "https://docs.vllm.ai/en/latest/features/spec_decode/",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "torch-source",
+    "title": "PyTorch v2.14.0 源码",
+    "url": "https://github.com/pytorch/pytorch/tree/v2.14.0",
+    "version": "v2.14.0，入口文件已读取",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "vllm-source",
+    "title": "vLLM v0.29.0 源码",
+    "url": "https://github.com/vllm-project/vllm/tree/v0.29.0",
+    "version": "v0.29.0，入口文件已读取",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "k8s-source",
+    "title": "Kubernetes v1.36.0 源码",
+    "url": "https://github.com/kubernetes/kubernetes/tree/v1.36.0",
+    "version": "v1.36.0，DRA 调度与节点入口已读取",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "megatron",
+    "title": "Megatron Core 并行策略",
+    "url": "https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/parallelism-guide.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "deepspeed",
+    "title": "DeepSpeed ZeRO 教程",
+    "url": "https://www.deepspeed.ai/tutorials/zero/",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "ray-train",
+    "title": "Ray Train 检查点与恢复",
+    "url": "https://docs.ray.io/en/latest/train/user-guides/fault-tolerance.html",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "trl",
+    "title": "TRL GRPO 训练器",
+    "url": "https://huggingface.co/docs/trl/grpo_trainer",
+    "version": "机制文档；具体实验版本见环境锁定文件",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
   }
 ]

@@ -1,0 +1,23 @@
+---
+import Base from './Base.astro';import sources from '../data/sources.json';import glossary from '../data/glossary.json';import {asset,reading,stages} from '../data/curriculum';
+const {entry,headings=[],kind='read'}=Astro.props;const d=entry.data;const isChapter=kind==='read';
+const index=reading.findIndex(c=>c.id===entry.id),prev=reading[index-1],next=reading[index+1];
+const stage=stages[(reading[index]?.stage||d.stage)-1];
+const label=isChapter?stage.title:kind==='projects'?'实践项目':kind==='code'?'源码阅读':'进阶研究';
+---
+<Base title={d.title} description={d.description} active={isChapter?'path/':kind+'/'}>
+<div class="reader" data-record={`${kind}/${entry.id}`} data-revision={d.revision}>
+ <div class="reader-top"><a href={asset(isChapter?`path/#${stage.id}`:kind+'/')}>{label}{isChapter&&` · ${index+1} / ${reading.length}`}</a><span>待真实试读</span></div>
+ <header class="reader-head"><h1>{d.title}</h1><p>{d.description}</p><div class="reader-meta"><span>约 {d.minutes} 分钟 · 阅读估计</span><a data-resume hidden>回到上次读到的地方 →</a></div></header>
+ <details class="reader-toc"><summary>本章路标</summary><nav aria-label="本章目录">{headings.filter((h:any)=>h.depth===2).map((h:any)=><a href={`#${h.slug}`}>{h.text}</a>)}<a href="#self-check">换个情况，解释一次</a></nav></details>
+ <article class="prose reader-prose" data-pagefind-body data-pagefind-weight={isChapter?2:1}><p class="sr-only" data-pagefind-weight="8">概念检索：{d.terms.map((id:string)=>{const t=glossary.find(x=>x.id===id);return t?[t.name,t.full,...t.aliases].join(' / '):''}).join('；')}</p>
+ {d.prerequisites.length>0&&<details class="prerequisite-note"><summary>这一章从哪些已有知识出发？</summary><ul>{d.prerequisites.map((id:string)=><li><a href={asset(`read/${id}/`)}>{reading.find(c=>c.id===id)?.title||id}</a></li>)}</ul></details>}
+ {d.environment&&<p class="environment-note">实验环境：{d.environment}。{d.verification}</p>}
+ <slot/>
+ <section class="understanding" id="self-check"><h2>换个情况，你能解释吗？</h2><p>{d.question}</p><details><summary>展开参考思路</summary><p>{d.answer}</p></details></section>
+ {d.project&&<a class="project-link" href={asset(`projects/${d.project}/`)}>把机制带到项目里 →</a>}
+ <p class="chapter-bridge">{d.bridge}</p>
+ <details class="reader-evidence"><summary>来源、版本与验证状态</summary><p>{d.verification}。教学计算不代表真实模型的性能；硬件结果以对应实验记录为准。</p>{d.sources.map((id:string)=>{const s=sources.find(x=>x.id===id);return s&&<div class="source-item"><a href={s.url} target="_blank" rel="noopener">{s.title} ↗</a><small>{s.kind} · {s.version} · 核验 {s.checked}</small></div>})}</details>
+ <details class="reader-notes" id="learning-notes"><summary>笔记、书签与学习状态</summary><div class="status-checks">{[['read','已阅读'],['understood','能解释'],['lab','实验完成'],['bookmark','加入书签'],['review','需要复习']].map(([field,text])=><label><input type="checkbox" data-record-field={field}/>{text}</label>)}</div><label for="lesson-note">记下你的解释，或卡住的那一句</label><textarea id="lesson-note" data-note rows="4" placeholder="先用自己的话解释，再记下仍不确定的地方。"></textarea><small data-save-status>仅保存在当前浏览器，可导出备份。</small></details>
+ {isChapter&&<nav class="lesson-pager" aria-label="前后章节">{prev?<a href={asset(`read/${prev.id}/`)}><small>回顾上一章</small>{prev.title}</a>:<span/>}{next?<a href={asset(`read/${next.id}/`)}><small>继续顺着读</small>{next.title} →</a>:<a href={asset('projects/')}><small>把知识组合起来</small>完成实践项目 →</a>}</nav>}
+ </article></div></Base>

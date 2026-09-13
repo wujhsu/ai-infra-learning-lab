@@ -1,0 +1,803 @@
+[
+  {
+    "id": "token",
+    "firstChapter": "generation",
+    "anchor": "tokens",
+    "aliases": [
+      "分词",
+      "词元"
+    ]
+  },
+  {
+    "id": "tensor",
+    "firstChapter": "representations",
+    "anchor": "shape",
+    "aliases": [
+      "shape",
+      "张量"
+    ]
+  },
+  {
+    "id": "attention",
+    "firstChapter": "attention",
+    "anchor": "weighted-sum",
+    "aliases": [
+      "QKV",
+      "注意力"
+    ]
+  },
+  {
+    "id": "prefill",
+    "firstChapter": "kv-reuse",
+    "anchor": "phases",
+    "aliases": [
+      "预填充"
+    ]
+  },
+  {
+    "id": "decode",
+    "firstChapter": "kv-reuse",
+    "anchor": "phases",
+    "aliases": [
+      "解码",
+      "解码阶段"
+    ]
+  },
+  {
+    "id": "kv-cache",
+    "firstChapter": "kv-reuse",
+    "anchor": "two-rounds",
+    "aliases": [
+      "KV 缓存",
+      "键值缓存",
+      "KV Cache"
+    ]
+  },
+  {
+    "id": "ttft",
+    "firstChapter": "scheduler",
+    "anchor": "",
+    "aliases": [
+      "首字延迟",
+      "首Token延迟"
+    ]
+  },
+  {
+    "id": "tpot",
+    "firstChapter": "scheduler",
+    "anchor": "",
+    "aliases": [
+      "平均输出延迟"
+    ]
+  },
+  {
+    "id": "itl",
+    "firstChapter": "scheduler",
+    "anchor": "",
+    "aliases": [
+      "token间隔"
+    ]
+  },
+  {
+    "id": "throughput",
+    "firstChapter": "scheduler",
+    "anchor": "",
+    "aliases": [
+      "吞吐"
+    ]
+  },
+  {
+    "id": "slo",
+    "firstChapter": "economics",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "batch",
+    "firstChapter": "data-pipeline",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "gpu",
+    "firstChapter": "gpu-memory",
+    "anchor": "",
+    "aliases": [
+      "显卡",
+      "加速器"
+    ]
+  },
+  {
+    "id": "hbm",
+    "firstChapter": "gpu-memory",
+    "anchor": "",
+    "aliases": [
+      "显存",
+      "高带宽内存"
+    ]
+  },
+  {
+    "id": "kernel",
+    "firstChapter": "tensor-runtime",
+    "anchor": "",
+    "aliases": [
+      "核函数",
+      "kernel launch"
+    ]
+  },
+  {
+    "id": "bandwidth",
+    "firstChapter": "gpu-memory",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "roofline",
+    "firstChapter": "gpu-memory",
+    "anchor": "",
+    "aliases": [
+      "屋顶线",
+      "操作强度"
+    ]
+  },
+  {
+    "id": "pod",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "容器组"
+    ]
+  },
+  {
+    "id": "controller",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "控制器",
+      "reconciliation"
+    ]
+  },
+  {
+    "id": "rank",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "world size"
+    ]
+  },
+  {
+    "id": "nccl",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "集合通信"
+    ]
+  },
+  {
+    "id": "allreduce",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "全归约"
+    ]
+  },
+  {
+    "id": "tp",
+    "firstChapter": "model-parallel",
+    "anchor": "",
+    "aliases": [
+      "张量并行"
+    ]
+  },
+  {
+    "id": "pp",
+    "firstChapter": "model-parallel",
+    "anchor": "",
+    "aliases": [
+      "流水线并行"
+    ]
+  },
+  {
+    "id": "dp",
+    "firstChapter": "model-parallel",
+    "anchor": "",
+    "aliases": [
+      "数据并行"
+    ]
+  },
+  {
+    "id": "ep",
+    "firstChapter": "model-parallel",
+    "anchor": "",
+    "aliases": [
+      "专家并行",
+      "MoE"
+    ]
+  },
+  {
+    "id": "numa",
+    "firstChapter": "scheduling",
+    "anchor": "",
+    "aliases": [
+      "拓扑",
+      "亲和性"
+    ]
+  },
+  {
+    "id": "rdma",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "远程直接内存访问",
+      "NIC"
+    ]
+  },
+  {
+    "id": "lsa",
+    "firstChapter": "nccl",
+    "anchor": "",
+    "aliases": [
+      "P2P"
+    ]
+  },
+  {
+    "id": "gin",
+    "firstChapter": "nccl",
+    "anchor": "",
+    "aliases": [
+      "设备发起通信"
+    ]
+  },
+  {
+    "id": "dra",
+    "firstChapter": "dra",
+    "anchor": "",
+    "aliases": [
+      "动态资源分配"
+    ]
+  },
+  {
+    "id": "lws",
+    "firstChapter": "lws",
+    "anchor": "",
+    "aliases": [
+      "LeaderWorkerSet",
+      "工作组"
+    ]
+  },
+  {
+    "id": "trace",
+    "firstChapter": "observability",
+    "anchor": "",
+    "aliases": [
+      "追踪",
+      "span",
+      "TraceID"
+    ]
+  },
+  {
+    "id": "canary",
+    "firstChapter": "delivery",
+    "anchor": "",
+    "aliases": [
+      "灰度发布",
+      "金丝雀"
+    ]
+  },
+  {
+    "id": "gitops",
+    "firstChapter": "delivery",
+    "anchor": "",
+    "aliases": [
+      "渐进交付"
+    ]
+  },
+  {
+    "id": "container",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "容器"
+    ]
+  },
+  {
+    "id": "image",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "镜像",
+      "digest"
+    ]
+  },
+  {
+    "id": "node",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "节点"
+    ]
+  },
+  {
+    "id": "deployment",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "部署控制器"
+    ]
+  },
+  {
+    "id": "service",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": [
+      "服务",
+      "服务发现"
+    ]
+  },
+  {
+    "id": "namespace",
+    "firstChapter": "scheduling",
+    "anchor": "",
+    "aliases": [
+      "命名空间"
+    ]
+  },
+  {
+    "id": "dtype",
+    "firstChapter": "attention",
+    "anchor": "",
+    "aliases": [
+      "数据类型",
+      "精度"
+    ]
+  },
+  {
+    "id": "gqa",
+    "firstChapter": "kv-allocation",
+    "anchor": "",
+    "aliases": [
+      "分组查询注意力",
+      "KV heads"
+    ]
+  },
+  {
+    "id": "moe",
+    "firstChapter": "model-parallel",
+    "anchor": "",
+    "aliases": [
+      "混合专家"
+    ]
+  },
+  {
+    "id": "pcie",
+    "firstChapter": "gpu-memory",
+    "anchor": "",
+    "aliases": [
+      "PCI Express"
+    ]
+  },
+  {
+    "id": "nvlink",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "高速互连"
+    ]
+  },
+  {
+    "id": "nic",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "网卡"
+    ]
+  },
+  {
+    "id": "sm",
+    "firstChapter": "tensor-runtime",
+    "anchor": "",
+    "aliases": [
+      "流式多处理器"
+    ]
+  },
+  {
+    "id": "stream",
+    "firstChapter": "nccl",
+    "anchor": "",
+    "aliases": [
+      "执行流",
+      "事件"
+    ]
+  },
+  {
+    "id": "allgather",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "全收集"
+    ]
+  },
+  {
+    "id": "reducescatter",
+    "firstChapter": "collectives",
+    "anchor": "",
+    "aliases": [
+      "归约分散"
+    ]
+  },
+  {
+    "id": "barrier",
+    "firstChapter": "nccl",
+    "anchor": "",
+    "aliases": [
+      "屏障",
+      "同步"
+    ]
+  },
+  {
+    "id": "cdi",
+    "firstChapter": "dra",
+    "anchor": "",
+    "aliases": [
+      "容器设备接口"
+    ]
+  },
+  {
+    "id": "span",
+    "firstChapter": "observability",
+    "anchor": "",
+    "aliases": [
+      "追踪跨度"
+    ]
+  },
+  {
+    "id": "sse",
+    "firstChapter": "scheduler",
+    "anchor": "",
+    "aliases": [
+      "流式事件",
+      "Server-Sent Events"
+    ]
+  },
+  {
+    "id": "keps",
+    "firstChapter": "dra",
+    "anchor": "",
+    "aliases": [
+      "KEP",
+      "增强提案"
+    ]
+  },
+  {
+    "id": "vocabulary",
+    "firstChapter": "generation",
+    "anchor": "tokens",
+    "aliases": [
+      "vocab"
+    ]
+  },
+  {
+    "id": "tokenizer",
+    "firstChapter": "generation",
+    "anchor": "tokens",
+    "aliases": [
+      "分词"
+    ]
+  },
+  {
+    "id": "parameters",
+    "firstChapter": "generation",
+    "anchor": "model-box",
+    "aliases": [
+      "weights",
+      "参数",
+      "权重"
+    ]
+  },
+  {
+    "id": "logits",
+    "firstChapter": "generation",
+    "anchor": "scores",
+    "aliases": [
+      "logit"
+    ]
+  },
+  {
+    "id": "sampling",
+    "firstChapter": "generation",
+    "anchor": "scores",
+    "aliases": []
+  },
+  {
+    "id": "autoregressive",
+    "firstChapter": "generation",
+    "anchor": "one-step",
+    "aliases": [
+      "自回归"
+    ]
+  },
+  {
+    "id": "vector",
+    "firstChapter": "representations",
+    "anchor": "vectors",
+    "aliases": []
+  },
+  {
+    "id": "embedding",
+    "firstChapter": "representations",
+    "anchor": "embedding",
+    "aliases": [
+      "词嵌入"
+    ]
+  },
+  {
+    "id": "matmul",
+    "firstChapter": "representations",
+    "anchor": "matrix",
+    "aliases": [
+      "矩阵"
+    ]
+  },
+  {
+    "id": "hidden-state",
+    "firstChapter": "representations",
+    "anchor": "layers",
+    "aliases": [
+      "激活",
+      "隐藏状态"
+    ]
+  },
+  {
+    "id": "forward",
+    "firstChapter": "representations",
+    "anchor": "layers",
+    "aliases": [
+      "前向传播"
+    ]
+  },
+  {
+    "id": "training",
+    "firstChapter": "representations",
+    "anchor": "training",
+    "aliases": [
+      "inference",
+      "推理"
+    ]
+  },
+  {
+    "id": "query",
+    "firstChapter": "attention",
+    "anchor": "qkv",
+    "aliases": [
+      "Q"
+    ]
+  },
+  {
+    "id": "key",
+    "firstChapter": "attention",
+    "anchor": "qkv",
+    "aliases": [
+      "K"
+    ]
+  },
+  {
+    "id": "value",
+    "firstChapter": "attention",
+    "anchor": "qkv",
+    "aliases": [
+      "V"
+    ]
+  },
+  {
+    "id": "dot-product",
+    "firstChapter": "attention",
+    "anchor": "scores",
+    "aliases": []
+  },
+  {
+    "id": "softmax",
+    "firstChapter": "attention",
+    "anchor": "softmax",
+    "aliases": []
+  },
+  {
+    "id": "causal-mask",
+    "firstChapter": "attention",
+    "anchor": "mask",
+    "aliases": [
+      "mask",
+      "因果掩码"
+    ]
+  },
+  {
+    "id": "loss",
+    "firstChapter": "gradients",
+    "anchor": "",
+    "aliases": [
+      "损失函数"
+    ]
+  },
+  {
+    "id": "gradient",
+    "firstChapter": "gradients",
+    "anchor": "",
+    "aliases": [
+      "导数"
+    ]
+  },
+  {
+    "id": "backprop",
+    "firstChapter": "gradients",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "optimizer",
+    "firstChapter": "gradients",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "activation",
+    "firstChapter": "gpu-memory",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "stride",
+    "firstChapter": "tensor-runtime",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "autograd",
+    "firstChapter": "tensor-runtime",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "checkpoint",
+    "firstChapter": "checkpoints-finetuning",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "lora",
+    "firstChapter": "checkpoints-finetuning",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "ddp",
+    "firstChapter": "ddp",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "fsdp",
+    "firstChapter": "sharding",
+    "anchor": "",
+    "aliases": [
+      "FSDP2",
+      "ZeRO"
+    ]
+  },
+  {
+    "id": "quantization",
+    "firstChapter": "quantization",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "speculative-decoding",
+    "firstChapter": "speculative-pd",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "artifact",
+    "firstChapter": "artifacts",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "quota",
+    "firstChapter": "scheduling",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "admission",
+    "firstChapter": "scheduling",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "pvc",
+    "firstChapter": "kubernetes",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "cardinality",
+    "firstChapter": "observability",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "agent",
+    "firstChapter": "cache-hierarchy",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "metrics",
+    "firstChapter": "observability",
+    "anchor": "",
+    "aliases": [
+      "指标",
+      "高基数",
+      "Metric"
+    ]
+  },
+  {
+    "id": "logs",
+    "firstChapter": "observability",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "pd",
+    "firstChapter": "speculative-pd",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "prefix-cache",
+    "firstChapter": "cache-hierarchy",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "cache-tier",
+    "firstChapter": "cache-hierarchy",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "preflight",
+    "firstChapter": "lws",
+    "anchor": "",
+    "aliases": []
+  },
+  {
+    "id": "resource-slice",
+    "firstChapter": "dra",
+    "anchor": "",
+    "aliases": [
+      "资源切片",
+      "设备库存",
+      "ResourceSlice"
+    ]
+  },
+  {
+    "id": "device-class",
+    "firstChapter": "dra",
+    "anchor": "",
+    "aliases": [
+      "设备类",
+      "DeviceClass"
+    ]
+  },
+  {
+    "id": "resource-claim",
+    "firstChapter": "dra",
+    "anchor": "",
+    "aliases": [
+      "资源声明",
+      "DeviceClass",
+      "ResourceSlice",
+      "ResourceClaim"
+    ]
+  }
+]

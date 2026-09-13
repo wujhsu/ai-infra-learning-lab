@@ -1,0 +1,87 @@
+---
+title: "张量怎样被 PyTorch 执行？"
+description: "从一个转置和一次设备复制出发，读懂张量布局、计算图与异步执行。"
+order: 8
+stage: 2
+minutes: 8
+revision: 2
+status: "preview"
+terms: ["stride", "autograd"]
+sources: ["pytorch", "autograd", "cuda"]
+sessions: []
+prerequisites: ["representations", "gpu-memory"]
+question: "转置后张量形状改变，是否意味着所有数据已经重新排列并复制了一遍？"
+answer: "不一定。转置可以只改变形状和步幅，共享原存储。后续要求连续布局的操作才可能触发复制，应检查 stride、is_contiguous 和实际执行记录。"
+bridge: "下一步：许多线程怎样一起完成计算？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "single-training"
+introduces: ["kernel", "sm", "stride", "autograd"]
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+上一章把数据分成权重、激活、梯度等类型。现在再问：这些数字在内存里怎样排列？一行看似简单的 PyTorch 代码，究竟只是改了描述，还是已经搬了数据？
+
+## 张量对象与底层存储不是同一个东西
+
+一个张量除了数值，还携带形状、数据类型、设备、步幅和存储偏移等信息。它们规定如何从底层存储找到某个元素。
+
+例如连续的两行三列矩阵 `[ [0,1,2], [3,4,5] ]`，底层可以顺序存为六个数。沿列方向走一格跨 1 个元素，沿行方向走一格跨 3 个元素，所以<Term id="stride"/> 为 `[3,1]`。
+
+转置后逻辑形状变成三行两列，步幅可以变为 `[1,3]`。数据仍在原存储里，只是读取方式变了。因此转置本身不一定复制全部数字。
+
+```python
+import torch
+x = torch.arange(6).reshape(2, 3)
+y = x.t()
+print(x.shape, x.stride())  # [2,3] 与 (3,1)
+print(y.shape, y.stride())  # [3,2] 与 (1,3)
+print(y.is_contiguous())   # False
+z = y.contiguous()
+print(z.stride())          # (2,1)，新连续布局
+```
+
+这段实验不需要 GPU。修改 x 的一个数，再观察 y 是否随之变化，可以验证它们是否共享存储；z 则是这里为形成连续布局而产生的数据复制。
+
+## 为什么 reshape 有时便宜，有时不便宜？
+
+如果目标形状能用原存储与合适的步幅表示，重排可能只创建一个视图。若做不到，就可能需要复制。`view` 有布局要求，`reshape` 会在需要时复制；不能仅凭函数名字就断言操作零成本。
+
+回到极小模型的多头注意力：把 `[B,T,C]` 拆为 `[B,T,H,D]` 后再调换维度，得到 `[B,H,T,D]`。头内计算完成后，需要回到原来的模型宽度。代码中的 `contiguous()` 就是在要求一份能按后续方式读取的连续布局。
+
+当 C 很大、层数很多时，这些布局转换的成本可能变得明显。但删除 contiguous 不是通用优化；必须确认下一项操作能接受当前布局，并且结果正确。
+
+## 设备是数值实际执行的地方
+
+`x.to('cuda')` 将张量放到 CUDA 设备，若 x 原来在 CPU，通常涉及传输。模型参数与输入需要放在相容的设备上。看到“两个张量设备不一致”的错误，先追踪每个张量在哪里创建、是否真的完成了设备迁移。
+
+模型移动到 GPU，不意味着数据加载器也自动把每批输入移动过去。新创建的常量、位置索引或遮罩也可能仍在 CPU；小模型里用 `device=ids.device` 创建位置数组，正是为避免这种隐蔽不一致。
+
+数据类型同样是执行约束。浮点值在不同精度下的表示范围和误差不同；不能为了让报错消失就随便把所有东西转成同一类型。用于查嵌入表的 ID 仍然需要合适的整数类型。
+
+## 从 Python 调用到算子执行
+
+Python 层组织模型结构与控制逻辑，PyTorch 的算子系统根据设备、数据类型等分派到实现。一个高层模块可能调用多个算子，一个算子也可能进一步启动一个或多个设备 kernel。
+
+因此，“一行 Python”不是性能分析中天然的一项设备工作。要看实际执行，需要 profiler 记录 CPU 发起与 GPU 时间线；后面的分析章节会把它们对齐。
+
+<Term id="autograd"/> 另外记录求导所需依赖。在需要梯度时，某些中间值会保留到反向使用。关闭梯度可以降低不必要的记录与存储，但不能用于还要更新参数的普通训练前向。
+
+## CPU 返回了，GPU 不一定完成了
+
+GPU 操作通常异步提交。CPU 发出工作后可能继续执行，因此围绕调用测一小段墙钟时间，可能只量到提交开销。
+
+更隐蔽的是把 GPU 张量转成 Python 标量，例如某些场景下的 `.item()`：CPU 必须拿到结果，可能因此等待设备完成。频繁打印训练损失或在循环里反复读取标量，会影响你想测量的时间线。
+
+这不是说永远不能读取结果，而是要知道同步发生在何处。训练日志可以按较大间隔记录；基准测试则应明确预热、同步和测量范围。
+
+## 先做三次观察，再优化
+
+第一，打印形状、步幅、设备和类型，确认语义正确。第二，观察是否共享存储以及哪里创建了新数据。第三，用 profiler 检查复制、同步与实际 kernel。
+
+这三个动作分别解决“算的对象对不对”“数据从哪里来”“时间花在哪里”。如果直接跳到修改底层 kernel，很容易把原本的数据问题当成算力问题。

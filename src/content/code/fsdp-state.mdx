@@ -1,0 +1,51 @@
+---
+title: "分片参数何时重新变完整？"
+description: "沿 fully_shard 的参数组与钩子，追踪一次前向反向的临时完整状态。"
+order: 3
+stage: 1
+minutes: 24
+revision: 2
+status: "preview"
+terms: []
+sources: ["torch-source", "fsdp", "checkpoint"]
+sessions: []
+prerequisites: ["sharding", "recovery"]
+question: "参数分片为四份，为什么峰值显存不一定正好降到四分之一？"
+answer: "执行时的完整参数、预取、激活与工作区仍占空间，且不同状态有不同生命周期；必须计算时间上的峰值。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "固定 tag 的入口源码已读取；硬件调用路径待设备上观察"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+本任务关注一份参数的生命周期，而不是安装另一个训练框架。先读分片章，能画出 AllGather 与 ReduceScatter 的输入输出，再进入实现。
+
+## 从公开入口建立预期
+
+阅读 [v2.14.0 fully_shard](https://github.com/pytorch/pytorch/blob/v2.14.0/torch/distributed/fsdp/_fully_shard/_fully_shard.py#L98)，检查 `mesh`、`reshard_after_forward` 与精度策略。源码说明了分片状态、执行前聚合和反向后的梯度处理。
+
+关键是“平时持有”和“计算此层时持有”不同。参数被分片，并不意味着每个 Linear 直接拿不完整权重做普通本地计算。执行边界会准备所需完整参数，随后根据策略释放或保留临时状态。
+
+## 为什么先包装子块
+
+本库 FSDP2 示例先对每个 Block 调 fully_shard，再处理根模块。阅读参数分组逻辑：已经属于子组的参数，不应再次被根组重复管理。若只把整个大模型当成一个组，临时完整参数的峰值与通信重叠机会会不同。
+
+画一条三层模型时间线，标出每层 AllGather、前向、可能重分片、反向前再次聚合和梯度 ReduceScatter。再标出预取可能让两组完整参数短暂同时存在的位置。
+
+## 不要只看一个内存数字
+
+分片参数的持久占用、临时完整参数、梯度、优化器状态和激活共同决定峰值。改变重分片策略可能减少通信，却增加保留时间。读取 `reshard_after_forward` 的当前版本默认规则，再做显式设置的对照；不要把旧博客默认值带入新环境。
+
+GPU 观察应记录每个阶段的峰值与通信时间。极小模型的固定开销占比高，适合检查状态，不适合证明大模型性能。
+
+## 检查点是另一个表示边界
+
+Distributed Checkpoint 需要知道分片状态及加载目标布局。先通过项目三的 CPU 保存加载对照，再在 FSDP2 GPU 模型上接入 `get_state_dict` 与 `set_state_dict`，验证恢复后的下一次更新。
+
+只保存一个 rank 的局部张量，通常不足以恢复完整模型；强行聚合全部参数再保存，又可能制造主机内存或网络峰值。选择检查点格式时要明确恢复场景，特别是 world size 改变时。
+
+本次已读取固定版本入口，GPU 分片与跨规模恢复未执行。阅读交付应列出每个状态的持有者、聚合时机、释放时机及检查点表示，避免把“显存除以卡数”当成全部机制。

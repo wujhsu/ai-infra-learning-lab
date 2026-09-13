@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-13",
+  "environment": "macOS arm64, Python 3.12.14, torch 2.14.0, CPU, 1 thread",
+  "command": "python labs/tiny_model/train.py --steps 100 --output /tmp/ai-infra-tiny-checkpoint.pt",
+  "training_loss_before": 2.5985586643218994,
+  "training_loss_after": 0.0008747270912863314,
+  "generated_ids": [[0,1,2,3,4,5,6]],
+  "cache_generation_equal": true,
+  "mechanism_tests_passed": 5,
+  "limitation": "Single-sentence overfit sanity check, not held-out evaluation or GPU performance measurement"
+}

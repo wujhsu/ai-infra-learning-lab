@@ -1,0 +1,51 @@
+---
+title: "KernelAgent 与编译泛化：怎样验证一个优化"
+description: "在主线机制之上研究适用条件、实现选择与可验证的问题。"
+order: 4
+stage: 1
+minutes: 25
+revision: 2
+status: "preview"
+terms: []
+sources: ["triton", "compile", "nsight", "schedule"]
+sessions: ["kernelagent", "pytorch-generalization"]
+prerequisites: ["kernel-lab", "compilation"]
+question: "一个 kernel 在单个大形状上更快，为什么还不能直接用于生产？"
+answer: "还需验证其他形状、布局、精度与数值边界，并计入编译和输入分布变化的成本。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "机制研究与资料核验；专题硬件实验未运行；待真实试读"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+主线已经解释 kernel、计时、编译和数值误差。本专题把大会中的 KernelAgent 与 PyTorch Generalization 放回一个共同问题：某个优化在一个输入上成功，凭什么相信它适用于更多输入？
+
+## 正确性是输入空间上的约束
+
+一个矩阵 kernel 可能对整齐的 128×128 输入工作，却在尾块、非连续布局、零长度或特殊数值上出错。验证集应覆盖形状边界、dtype、stride、数值范围与误差容限。参考实现与候选实现不能共享同一个错误假设。
+
+主线 Triton 加法实验专门包含 255、256、257，目的是跨过块边界。这个思路扩展到归约时，还要检查累加顺序与精度；扩展到 Attention 时，需要检查遮罩、长度与缓存偏移。
+
+## 让优化循环留下可复用证据
+
+<Diagram id="agent-loop" caption="候选先过正确性门，再测量并解释瓶颈；失败也是应保存的实验结果。" />
+
+Agent 可以提出分块或融合方案，运行检查并读 profiler，但每个性能主张仍需固定硬件、输入和基线。不能因为代码由多个 Agent 讨论过，就降低验证要求。
+
+KernelAgent 会议材料可作为这个循环的案例。其宣传或演示数字带有特定任务集、硬件和比较基线，不能直接迁移到你的模型。先在自己的任务上重建验证器与性能账本，再尝试自动搜索。
+
+## 编译泛化不只是“能处理动态形状”
+
+泛化意味着同一程序或优化能在更多合理条件下保持语义与可接受性能。动态形状减少重新编译的机会，但也可能限制专门化；更强专门化可能提高某些形状速度，却增加缓存与编译成本。
+
+为输入分布设计三组测试：已知热点形状、邻近变化、明显不同布局或规模。分别记录正确性、重新编译次数、冷启动和稳态。只在一个热形状上测量，会漏掉真实服务的变化成本。
+
+## 研究任务
+
+从项目二的简单算子出发，只允许改变一种策略，例如块大小。先完整通过正确性，再用重复样本测量；查看内存吞吐与启动开销，解释结果。随后改变输入分布，观察最优设置是否改变。
+
+最终保存候选代码、失败输入、原始时间、编译信息和结论范围。大会材料在这里提供研究视角，核心能力仍来自可重复的验证循环。

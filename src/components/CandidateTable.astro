@@ -1,0 +1,4 @@
+---
+import {model} from '../lib/toy-model';
+---
+<div class="figure-table"><table><thead><tr><th>候选 token</th><th>本轮示意概率</th></tr></thead><tbody>{model.vocabulary.map((token,i)=><tr><td>{token}</td><td>{(model.candidateProbabilities[i]*100).toFixed(0)}%</td></tr>)}</tbody></table></div>

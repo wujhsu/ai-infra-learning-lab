@@ -1,0 +1,61 @@
+---
+title: "torch.compile 怎样接住 Python 执行？"
+description: "区分捕获、守卫、后端编译和运行，用一次形状变化观察重新编译。"
+order: 4
+stage: 1
+minutes: 24
+revision: 2
+status: "preview"
+terms: []
+sources: ["torch-source", "compile-basics", "compile"]
+sessions: []
+prerequisites: ["compilation"]
+question: "第二次调用变快，为什么不能直接归因为算子融合？"
+answer: "可能只是首次编译或初始化成本不再发生；还需查看生成路径与稳态对照，区分缓存、启动和执行优化。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "固定 tag 的入口源码已读取；硬件调用路径待设备上观察"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+前置是算子、计时与编译章节。本任务只追“哪些 Python 执行被转成图、何时复用编译结果”，不尝试在一篇文章解释全部编译器。
+
+## 找到包装与优化入口
+
+从 [v2.14.0 eval_frame.py 的 compile_wrapper](https://github.com/pytorch/pytorch/blob/v2.14.0/torch/_dynamo/eval_frame.py#L1147) 和 [optimize 入口](https://github.com/pytorch/pytorch/blob/v2.14.0/torch/_dynamo/eval_frame.py#L1775) 建立阅读范围。区分用户函数、捕获上下文与后端处理；这些层不是同一个 kernel。
+
+<Diagram id="compile" caption="图捕获、条件检查与后端生成分别承担不同任务；图断点与重新编译要从日志观察。" />
+
+守卫用于判断缓存的编译结果是否仍适用于当前输入与状态。形状、类型或相关 Python 状态变化可能导致不同路径。动态形状能扩展复用范围，但不是忽略所有形状约束。
+
+## 做一个最小可观察实验
+
+```python
+import torch
+@torch.compile
+def f(x):
+    return (x.sin() + x).relu()
+for n in [16,16,32,32]:
+    x = torch.randn(n)
+    torch.testing.assert_close(f(x), (x.sin()+x).relu())
+```
+
+把程序存成文件，以 `TORCH_LOGS=recompiles,graph_breaks` 运行。先看第一次与重复形状，再看形状变化；记录实际日志，不预先断言某次一定重新编译，因为动态策略与版本会影响结果。
+
+正确性对照来自 eager 表达式。计时要区分首次编译与稳态；CPU 结果只说明 CPU 后端，不能当作 CUDA 性能。
+
+## 遇到图断点怎样继续读
+
+如果函数中包含无法捕获的操作，执行可能分成图与普通 Python 段。先定位断点附近的代码，再判断它是否位于热点循环。减少断点不应以改变模型语义为代价。
+
+源码追踪继续沿后端调用观察图传递，而不是看到一段生成代码就推断全部函数已被融合。检查算子数量、内存读写和实际 profiler，才能回答编译为什么有收益或没有收益。
+
+## CUDA Graph 是不同层次
+
+CUDA Graph 主要复用设备执行提交结构；torch.compile 处理程序捕获与后端生成。二者可能组合，但内存地址、形状和运行约束不同。把一次 Python 函数包装当成自动消除所有 GPU 启动开销，会掩盖实际边界。
+
+最终交付包含固定版本、输入变化序列、正确性结果、日志与冷/热计时。若没有硬件，就完成捕获与日志观察，并明确 GPU 部分尚未验证。

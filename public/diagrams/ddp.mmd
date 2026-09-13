@@ -1,0 +1,13 @@
+flowchart TB
+ subgraph A[rank 0]
+  L0[本地样本与损失] --> B0[反向：梯度逐组就绪]
+ end
+ subgraph B[rank 1]
+  L1[另一份样本与损失] --> B1[反向：梯度逐组就绪]
+ end
+ B0 --> C[同步对应梯度组]
+ B1 --> C
+ C --> U0[rank 0：相同更新规则]
+ C --> U1[rank 1：相同更新规则]
+ U0 --> W0[一致参数]
+ U1 --> W1[一致参数]

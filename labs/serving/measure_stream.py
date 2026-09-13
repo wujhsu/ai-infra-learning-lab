@@ -2,7 +2,7 @@
 import argparse,json,time,urllib.request,urllib.error,concurrent.futures,statistics
 
 def measure(url,model,prompt,max_tokens):
- payload={'model':model,'messages':[{'role':'user','content':prompt}],'max_tokens':max_tokens,'temperature':0,'stream':True,'stream_options':{'include_usage':True}}
+ payload={'model':model,'messages':[{'role':'user','content':prompt}],'max_tokens':max_tokens,'temperature':0,'stream':True,'stream_options':{'include_usage':True},'chat_template_kwargs':{'enable_thinking':False}}
  started=time.perf_counter();chunks=[];usage=None;completed=False
  try:
   req=urllib.request.Request(url.rstrip('/')+'/v1/chat/completions',data=json.dumps(payload).encode(),headers={'Content-Type':'application/json'})

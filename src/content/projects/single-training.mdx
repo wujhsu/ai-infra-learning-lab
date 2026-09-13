@@ -1,0 +1,83 @@
+---
+title: "项目二 · 单机训练与微调"
+description: "从单句机制检查走向真实模型微调：管理数据、精度、评估和性能。"
+order: 2
+stage: 1
+minutes: 27
+revision: 2
+status: "preview"
+terms: []
+sources: ["pytorch", "lora", "qwen", "amp", "triton"]
+sessions: []
+prerequisites: ["checkpoints-finetuning", "kernel-lab"]
+question: "保存了 LoRA 适配器，能否直接从中恢复完整训练轨迹？"
+answer: "不能。适配器主要保存更新参数；还需相同基础模型、优化器、步数、随机与数据进度等训练状态。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "代码与固定依赖已整理；LoRA/Triton GPU 执行未验证"
+environment: "CPU 准备；CUDA GPU 微调与算子实验"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+<a href={asset('downloads/labs.zip')}>下载全部实验源码 ZIP</a>，或克隆本站仓库。下列命令从仓库根目录执行；ZIP 只包含 `labs/`，涉及 `tests/` 的自动化检查请使用仓库。实际用时取决于安装、下载和设备，本页不把阅读时间当成实验时间。
+
+## 先明确三个不同的结果
+
+极小模型证明训练循环能工作；真实模型 LoRA 实验证明参数高效微调路径能运行；独立评估才回答模型是否学到了目标能力。不要把四条训练样本上 loss 降低写成质量提升。
+
+本项目包含 CPU 的数据与恢复练习，以及 CUDA GPU 上的 Qwen3-0.6B 微调和 kernel 分析。GPU 路径尚未在本次环境执行，不提供虚构显存或耗时成绩。先完成数据、训练内存和检查点章节。
+
+## 先做一份不会泄漏的实验数据
+
+建立训练、验证与测试三份数据，按来源实体或文档分组切分，再检查精确及近似重复。对于回答格式任务，输入模板与标签范围必须一致；padding 与提示部分在损失中按任务规则遮罩。
+
+先用四条自写的“数字格式”样本检查管线，再扩成独立数据。脚本中的四条仅用于运行自检；真正评估应使用未参与训练的数字、表达方式和更长上下文。记录每条数据所属集合及转换版本。
+
+## 锁定模型与运行环境
+
+```bash
+python3.12 -m venv .venv-lora
+source .venv-lora/bin/activate
+python -m pip install -r labs/single_training/requirements.txt
+python -c 'import torch; print(torch.__version__, torch.cuda.is_available())'
+python labs/single_training/lora.py
+```
+
+脚本锁定模型 revision、Transformers 5.17.0、PEFT 0.20.0 和 PyTorch 2.14.0。它使用 CUDA BF16，设备必须支持相应执行路径；不满足时先停止并选择经过验证的精度配置，不能静默把 CPU 运行当作 GPU 结果。
+
+读取脚本时沿着四个观察点：提示模板如何变为 ID，标签哪些位置为 `-100`，哪些参数可训练，保存的是适配器还是完整基础模型。LoRA 默认只更新指定投影中的低秩参数，基础权重仍需在加载时提供。
+
+## 逐项检查训练是否真的发生
+
+记录可训练参数数目、第一步与最后一步 loss、梯度是否有限、保存文件与制品清单。把适配器重新加载到同一基础 revision，再用固定评估输入比较训练前后输出。保存前后输出一致性与“比基线更好”是不同检查。
+
+当前脚本输出适配器与 tokenizer 供加载验证，不提供真实数据训练的完整恢复管线。需要长任务时，应补齐优化器、随机状态、采样进度和累计步数，再按项目一的方法比较恢复后的下一次更新。不能仅凭 `save_pretrained` 宣称训练恢复已实现。
+
+## 用显存账本选择改动
+
+先测固定批次、长度、精度下的峰值。再分别尝试梯度累积、混合精度和激活重计算。每次记录实际有效 token 数与全局批次，避免优化时偷偷改变训练目标。
+
+梯度累积降低单次激活峰值，却不会按相同比例减少参数或优化器状态；LoRA 减少可训练状态，但基础权重仍占空间。若输入长度翻倍导致峰值增加，要从激活与 Attention 数据入手解释。
+
+## 小算子性能支线
+
+```bash
+python -m pip install -r labs/kernel/requirements.txt
+python labs/kernel/triton_add.py > kernel-result.json
+python labs/kernel/triton_fused.py > fused-result.json
+python labs/kernel/benchmark.py
+```
+
+Triton 程序先检查 0、1、255、256、257 和非整块长度，再测一百万余元素的加法。尾块遮罩用于避免越界，不能为了性能省去。结果包含预热后多次 CUDA event 测量；计时含输出分配和启动，不是纯 kernel 延迟。
+
+比较结果时写出输入形状、精度、设备、重复次数与原始样本。简单加法未必比 PyTorch 快；能解释为什么没有收益，也是有效实验结果。编译首次开销应单列，不混入稳态平均值。
+
+## 故障与交付
+
+遇到 OOM，先记录峰值阶段，再缩小微批次或长度；loss 为 NaN，检查数据、学习率、精度与梯度；模型能加载但输出格式错，核对 tokenizer、模板与适配器身份。每种故障先建立最小对照。
+
+最终交付数据说明、配置、适配器身份、独立评估、性能账本和恢复边界。清理时仅删除本实验输出目录与临时分析文件，保留可复现清单。模型缓存是可共享下载资产，不应不加区分地整目录删除。

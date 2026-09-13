@@ -1,4 +1,0 @@
----
-import {getCollection} from 'astro:content';import Base from '../../layouts/Base.astro';import {asset} from '../../data/curriculum';const labs=(await getCollection('labs')).sort((a,b)=>a.data.order-b.data.order);
----
-<Base title="动手实验" active="labs/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">先预测，再测量</span><h1>让理解在系统里得到验证</h1><p>从小尺寸数学验证开始，逐步进入 GPU、多节点和 Kubernetes。保留原始结果，也保留未验证的边界。</p><a class="button secondary" href={asset('downloads/labs.zip')}>下载完整实验包 ↓</a></header><div class="resource-grid">{labs.map(e=><a class="resource-card" href={asset(`labs/${e.id}/`)}><small>{e.data.verified}</small><h2>{e.data.title}</h2><p>{e.data.description}</p></a>)}</div></div></Base>

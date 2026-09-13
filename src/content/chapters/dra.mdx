@@ -1,0 +1,78 @@
+---
+title: "一次设备请求怎样变成可用的 GPU？"
+description: "沿着一个设备请求追踪对象、控制面分配、节点准备、释放与故障边界。"
+order: 32
+stage: 9
+minutes: 10
+revision: 2
+status: "preview"
+terms: ["dra", "resource-slice", "device-class", "resource-claim"]
+sources: ["dra", "dra-features"]
+sessions: ["kubernetes-dra"]
+prerequisites: ["scheduling"]
+question: "ResourceClaim 已分配，但容器仍无法使用 GPU，下一步查哪里？"
+answer: "查 Pod 事件、节点可达性、kubelet 与 DRA 驱动准备结果及容器设备配置。控制面分配不是节点侧准备成功的证明。"
+bridge: "下一步：多进程推理怎样一起启动和恢复？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "platform"
+introduces: ["dra", "cdi", "keps", "resource-slice", "device-class", "resource-claim"]
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+前一章的任务已经获得预算，现在它需要一张具有指定显存属性的 GPU。传统的整数扩展资源擅长表达“几张”，但更丰富的设备属性、请求约束与分配结果需要清楚的数据接口。<Term id="dra" /> 将这些关系表达为 Kubernetes 对象，并把分配决定与节点侧准备连接起来。
+
+先建立边界：DRA 不是 GPU 驱动本身，也不会替模型计算显存需求。它提供设备发现、请求与分配框架；驱动负责报告真实设备并落实所支持的配置。
+
+## 四个对象分别回答什么
+
+<Term id="resource-slice" /> 描述驱动发布的设备库存，例如设备属于哪个池、哪些节点可访问、有哪些属性。<Term id="device-class" /> 表达一类设备的选择规则与相关配置。<Term id="resource-claim" /> 是工作负载对设备的具体请求，并记录分配结果。ResourceClaimTemplate 则用于按模板生成声明，避免手工为每个 Pod 编写独立对象。
+
+可以把它们放回当前例子：库存说“GPU A 有 24 GiB，GPU B 有 48 GiB”；类别规定这是某个驱动管理的 GPU；声明要求“至少 32 GiB”；调度与分配流程在可达、可用且满足其他约束的候选中找到设备。属性名称、单位和表达式以驱动定义为准，不能猜一个字段名称就认为所有厂商都支持。
+
+## 从创建到容器可用
+
+<Diagram id="dra-flow" caption="基本路径：库存与请求进入调度，分配结果再被节点侧兑现。这里省略高级功能门与驱动可选优化。" />
+
+创建引用声明的 Pod 后，系统要找到满足 Pod 放置条件与设备要求的组合。分配结果写入 ResourceClaim；Pod 被安排到可访问该资源的节点；kubelet 与相应驱动协调节点准备，把容器需要的设备访问配置落实。基本流程及版本差异以官方文档为准。[DRA 工作流程](https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/how-dra-works/)
+
+“Claim 已分配”只证明控制面做出了选择，不能证明节点设备准备成功。驱动调用失败、设备状态变化、运行时配置错误，都可能发生在后面。因此，排障必须沿生命周期逐步查看，不能只搜索某一条 GPU 报错。
+
+<Demo type="dra" client:visible />
+
+演示是一个小候选集的机制模型，不复制 Kubernetes 的完整调度算法、并发冲突处理或全部 API。它用于让你区分过滤、选择和准备，不能用演示输出预测生产调度顺序。
+
+## 一个请求要检查哪些状态
+
+```bash
+kubectl get deviceclasses
+kubectl get resourceslices
+kubectl -n inference-lab get resourceclaims
+kubectl -n inference-lab describe resourceclaim CLAIM_NAME
+kubectl -n inference-lab describe pod POD_NAME
+```
+
+前两条检查库存与类别是否存在；第三、四条检查请求和分配结果；最后一条查看 Pod 事件。名称由实际创建结果替换。若库存正确但声明未分配，查请求条件、可达节点和占用；若已分配但 Pod 无法启动，继续查节点驱动及 kubelet 事件。
+
+在实验前记录 Kubernetes 版本、DRA 驱动镜像、资源 API 版本与功能门。核心 API 稳定不代表所有高级子功能都已稳定或默认开启。比如设备绑定条件与容量共享等能力有各自版本状态，不应从会议路线图直接推断本集群可用。
+
+## 释放不是删除一个名字那么简单
+
+当工作负载结束，系统需要完成节点侧清理，并在声明生命周期允许时释放分配。独立声明可以有不同于单个 Pod 的寿命；从模板产生的声明有其所有者关系。删除 Pod 之后是否还能看到声明，要结合创建方式判断。
+
+真正的回收验收应提交另一个符合条件的请求，确认设备能再次分配并使用，同时检查旧消费者已经不能继续访问不属于它的资源。节点失联、驱动重启和重复清理调用都需要处理；因此，驱动操作的幂等性与状态恢复是可靠性问题的一部分。
+
+## 再读大会分配图
+
+<Slide id="kubernetes-dra-23" steps={["用本章概念标出库存、设备请求和使用设备的 Pod。", "把控制面的候选选择与分配记录连起来。", "继续追到节点准备；已分配不等于容器已经能使用。"]} />
+
+读图时先用本章的四个对象定位每条箭头，再分别标出控制面选择与节点侧准备。会议图用于理解讲者当时强调的设计；当前集群的对象版本和功能状态仍以官方文档与安装版本为准。不要把一张流程图读成“所有步骤都由一个控制器同步完成”。
+
+配套项目提供可替换驱动字段的模板，并明确它不是开箱即用的通用 GPU 清单。先用官方示例驱动理解对象变化，再在有真实 GPU 的环境验证设备准备与回收，两类实验的结论范围不同。
+
+下一章把多个这样的设备消费者组织成一个模型工作组，并决定部分成员失败时如何处理。

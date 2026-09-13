@@ -2,4 +2,4 @@
 import {asset} from '../data/curriculum';
 const {id,caption}=Astro.props;
 ---
-<figure class="diagram"><a href={asset(`diagrams/${id}.svg`)} data-zoom data-caption={caption}><img src={asset(`diagrams/${id}.svg`)} alt={caption} loading="lazy" /></a><figcaption>{caption} · 点击查看大图</figcaption></figure>
+<figure class="learning-figure"><a href={asset(`diagrams/${id}.svg`)} data-zoom data-caption={caption}><img src={asset(`diagrams/${id}.svg`)} alt={caption} loading="lazy"/></a><figcaption>{caption} · <a href={asset(`diagrams/${id}.svg`)}>放大阅读</a></figcaption></figure>

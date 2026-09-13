@@ -1,0 +1,49 @@
+---
+title: "比较推理引擎：先固定工作负载"
+description: "在主线机制之上研究适用条件、实现选择与可验证的问题。"
+order: 3
+stage: 1
+minutes: 25
+revision: 2
+status: "preview"
+terms: []
+sources: ["vllm", "vllm-serving"]
+sessions: []
+prerequisites: ["speculative-pd", "economics"]
+question: "为什么相同 max_tokens 仍不足以保证两个引擎的吞吐比较公平？"
+answer: "实际停止、模板、tokenizer、思考模式与输出长度可能不同；还需比较实际 token 工作量、质量和完整配置。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "机制研究与资料核验；专题硬件实验未运行；待真实试读"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+vLLM、SGLang 与 TensorRT-LLM 都可以参与高效推理，但项目名称不是性能结论。主线用 vLLM 建立数据流；比较其他实现时，保持这张数据流图，逐项寻找它们的不同取舍。
+
+## 接口相同不代表行为相同
+
+相似的 API 可能使用不同提示模板、停止规则、默认精度、批处理、缓存或思考模式。先固定输入 token、模型 revision、生成设置和结束条件，再比较输出数量与质量。否则“更快”可能只是少生成了内容。
+
+对复杂 Agent，结构化输出、工具调用、多轮前缀与取消语义都影响可用性。一个引擎的极限吞吐不代表它满足这些功能边界。应先写必须通过的正确性与生命周期用例，再测速度。
+
+## 三层比较表
+
+第一层是能力：模型架构、硬件、精度、并行、结构化输出与观测支持。第二层是执行：请求队列、缓存组织、kernel 和编译路径。第三层是运维：启动、制品、版本升级、失败恢复与问题定位。
+
+SGLang 的官方文档可用于核对运行和调度相关功能；TensorRT-LLM 的官方文档用于核对模型、构建与后端能力。它们变化较快，应为具体实验固定版本，而不在教材写一张永远正确的排行榜。[SGLang](https://docs.sglang.ai/)、[TensorRT-LLM](https://nvidia.github.io/TensorRT-LLM/)
+
+## 一次公平的对照
+
+选择短问答、长输入、共享前缀和混合输出长度四类负载。每类先确认文本与 usage 口径，再测冷启动、稳态、容量压力和取消。至少记录 TTFT、输出间隔、合格吞吐、显存和失败率。
+
+相同硬件预算与相同延迟目标，比“两个系统都使用默认设置”更有解释力。允许各引擎采用合理调优，但必须公开配置与调优预算，避免只给其中一个系统精心优化。
+
+## 结论要包含代价
+
+如果引擎 A 对固定模型低延迟最好，但升级模型需要重新构建或验证更多步骤，这属于交付成本。引擎 B 的某类缓存有效，但目标负载很少共享前缀，优势可能消失。
+
+最终应写成“在这些模型与请求条件下，我们选择某实现，因为满足功能门并改善这些指标；改变这些条件时重测”。这份结论能迁移到新版本，也比产品宣传数字更可复查。

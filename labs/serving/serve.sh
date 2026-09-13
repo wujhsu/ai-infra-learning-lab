@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-: "${MODEL:=Qwen/Qwen2.5-0.5B-Instruct}"
+: "${MODEL:=Qwen/Qwen3-0.6B}"
 : "${IMAGE:=vllm/vllm-openai:v0.29.0}"
 if [[ -f experiment.env ]]; then source experiment.env; fi
 : "${MODEL_REVISION:?Run python3 prepare.py first, or set a fixed model commit}"

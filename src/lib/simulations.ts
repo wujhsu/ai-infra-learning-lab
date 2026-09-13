@@ -29,6 +29,7 @@ export function cacheBenefit(sizeGB:number,bandwidth:number,recomputeMs:number,o
 }
 export const cacheTrace=['root','middle','tail','other','root','middle','tail','END','other'];
 export function cachePolicy(step:number,policy:'lru'|'prefix'|'session'){
+ if(!Number.isInteger(step)||step<0||step>=cacheTrace.length||!['lru','prefix','session'].includes(policy))throw new Error('Invalid cache trace');
  let cache:string[]=[];let hits=0,misses=0;const capacity=3;
  for(const key of cacheTrace.slice(0,step+1)){
   if(key==='END'){if(policy==='session')cache=cache.filter(k=>!['root','middle','tail'].includes(k));continue;}
@@ -39,4 +40,6 @@ export function cachePolicy(step:number,policy:'lru'|'prefix'|'session'){
  }return{cache,hits,misses};
 }
 export const devices=[{id:'GPU-0',memory:80,numa:0,healthy:true},{id:'GPU-1',memory:24,numa:1,healthy:true},{id:'GPU-2',memory:80,numa:1,healthy:false}];
-export function selectDevices(memory:number,sameNuma:boolean){return devices.filter(d=>d.healthy&&d.memory>=memory&&(!sameNuma||d.numa===0));}
+export function selectDevices(memory:number,sameNuma:boolean){if(!Number.isFinite(memory)||memory<=0)throw new Error('Invalid device capacity');return devices.filter(d=>d.healthy&&d.memory>=memory&&(!sameNuma||d.numa===0));}
+
+export function gradientUpdate(rate:number){if(!Number.isFinite(rate)||rate<0)throw new Error("Invalid rate");const next=2-rate*(-8);return{next,loss:(next*2-6)**2};}

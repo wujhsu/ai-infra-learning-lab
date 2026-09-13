@@ -1,0 +1,11 @@
+flowchart TB
+ DR[设备驱动] --> I[ResourceSlice：库存]
+ CL[DeviceClass：类别规则] --> S[调度与分配]
+ RC[ResourceClaim：请求] --> S
+ I --> S
+ P[Pod：引用声明] --> S
+ S --> A[Claim 分配结果]
+ A --> K[kubelet 与节点驱动准备]
+ K --> C[容器使用设备]
+ C --> U[清理与声明生命周期]
+ U --> I

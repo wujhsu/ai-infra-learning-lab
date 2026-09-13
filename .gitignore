@@ -13,3 +13,8 @@ labs/**/experiment.env
 labs/**/environment.json
 labs/**/image-digests.json
 labs/**/model-cache/
+
+.venv*/
+results/
+*.pt
+*.jsonl

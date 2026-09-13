@@ -1,0 +1,92 @@
+---
+title: "训练为什么比推理更占显存？"
+description: "从一次参数更新的生命周期出发，区分几种节省显存的方法究竟省掉哪一项。"
+order: 11
+stage: 3
+minutes: 10
+revision: 2
+status: "preview"
+terms: []
+sources: ["amp", "checkpoint", "pytorch"]
+sessions: []
+prerequisites: ["gpu-memory", "data-pipeline", "gradients"]
+question: "梯度累积把微批次从 8 降到 1，为什么仍然可能装不下模型？"
+answer: "累积主要帮助降低单次激活规模，不会消除模型权重、梯度、优化器状态和其他常驻数据。若常驻项已经超过容量，需要改变模型、精度或状态分片。"
+bridge: "下一步：怎样保存、恢复并微调真实模型？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "single-training"
+introduces: []
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+我们已经知道训练显存包含参数、梯度、优化器状态、激活和临时量。现在模型装得下，训练到反向却报内存不足。应该先减批次、改精度，还是做重计算？它们处理的是不同账目。
+
+## 按阶段观察峰值
+
+加载模型后主要有参数；前向途中逐渐产生为反向保留的激活；反向产生梯度并释放部分中间量；优化器更新可能第一次创建状态或临时张量。峰值发生的位置不同，原因也可能不同。
+
+先记录每个阶段的已分配与峰值内存。若第一步 optimizer.step 才突然上升，优化器状态可能是重要因素；若序列长度一增就涨得很快，激活和注意力中间量值得优先检查。
+
+不要把监控中的“保留内存”全当成活跃张量：缓存分配器可能保留已释放的数据块以供下次复用。判断泄漏要看同等工作负载下是否持续增长，以及是否存在仍被引用的张量。
+
+## 梯度累积：用多次小批次形成一次更新
+
+如果目标有效批次是 32，而显存只能容纳 8，可以连续处理四个微批次，累积梯度后再更新一次。这里模型参数在四次反向之间保持不变。
+
+```python
+optimizer.zero_grad(set_to_none=True)
+for micro_batch in four_micro_batches:
+    loss = loss_fn(model(micro_batch), target(micro_batch))
+    (loss / 4).backward()
+optimizer.step()
+```
+
+除以 4 适用于四个微批次贡献权重相同的平均目标。若有效 token 数不同，要按真正的目标权重归一化，不能机械平均四个平均值。Dropout、批次相关操作及数值误差也会影响与一次大批次的精确等价性。
+
+累积降低单次保留的激活规模，但参数与优化器状态不会因此消失。它还改变每次更新前的工作量，日志中的 step、sample 和 token 必须分别定义。
+
+## 混合精度：不同数据不必用同一种表示
+
+FP32 通常每元素 4 字节，FP16 与 BF16 通常每元素 2 字节。低精度可以减少数据量，并利用支持的快速计算路径。但表示范围与精度不同，不能因为二者都占两字节就认为数值行为相同。
+
+混合精度让某些运算使用低精度，同时保留需要更稳定计算的部分。FP16 训练常结合梯度缩放，避免很小的梯度在有限表示中丢失；BF16 是否需要相同策略不能照搬。
+
+```python
+with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+    loss = compute_loss(model, batch)
+loss.backward()
+optimizer.step()
+```
+
+这是 BF16 路径的结构示例，需要 GPU 和算子支持。具体权重、梯度、优化器状态的存储精度由实现决定；不要把所有项简单乘以二分之一来估算完整训练内存。
+
+## 激活重计算：少保存，反向时再算
+
+普通反向需要前向的某些中间值。激活检查点或重计算策略只保存选定边界，反向时重新执行相应前向片段，换取较低的激活存储。
+
+这省的是保留的中间量，代价是额外计算。它与把训练状态写入磁盘的恢复检查点不是同一件事，尽管英文都含 checkpoint。
+
+```python
+from torch.utils.checkpoint import checkpoint
+x = checkpoint(block, x, use_reentrant=False)
+```
+
+这里只展示包裹某段计算的接口。真实使用还要检查随机行为、副作用和实现要求，确保重算与原始计算相容。若前向偷偷修改外部状态，重执行可能不再等价。
+
+## 三种方法能否组合？
+
+可以，但每种贡献不同：减小微批次减少一次参与计算的样本；累积恢复有效更新规模；低精度改变数值存储与执行；重计算减少被保留的激活。组合后仍可能被参数或优化器状态限制，那就需要分片或更小模型。
+
+记录每次只改变一项的实验：峰值内存、每有效 token 时间、损失是否有限、与基线的数值或质量差异。显存降了却每步慢一倍，是否值得取决于是否因此能完成原来无法运行的训练。
+
+## 从错误信息回到具体账目
+
+若内存不足发生在模型加载，优先核对权重规模与设备；若发生在长序列前向，检查激活与注意力；若发生在首次更新，检查状态与临时内存。动态形状、碎片和其他进程也可能参与，阶段判断只是定位起点。
+
+下一章把运行状态保存下来，再将训练方法应用于真实预训练模型的微调。

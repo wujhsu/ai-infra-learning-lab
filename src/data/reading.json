@@ -1,0 +1,230 @@
+[
+  {
+    "id": "generation",
+    "title": "模型怎样接着写下去？",
+    "stage": 1,
+    "order": 1
+  },
+  {
+    "id": "representations",
+    "title": "文字进入模型后变成什么？",
+    "stage": 1,
+    "order": 2
+  },
+  {
+    "id": "attention",
+    "title": "当前位置怎样利用前文？",
+    "stage": 1,
+    "order": 3
+  },
+  {
+    "id": "kv-reuse",
+    "title": "为什么历史计算可以复用？",
+    "stage": 1,
+    "order": 4
+  },
+  {
+    "id": "gradients",
+    "title": "模型怎样知道参数该往哪边改？",
+    "stage": 1,
+    "order": 5
+  },
+  {
+    "id": "tiny-training",
+    "title": "把计算接成一个真的训练循环",
+    "stage": 1,
+    "order": 6
+  },
+  {
+    "id": "gpu-memory",
+    "title": "模型的数据到底放在哪里？",
+    "stage": 2,
+    "order": 7
+  },
+  {
+    "id": "tensor-runtime",
+    "title": "张量怎样被 PyTorch 执行？",
+    "stage": 2,
+    "order": 8
+  },
+  {
+    "id": "gpu-execution",
+    "title": "许多线程怎样一起完成计算？",
+    "stage": 2,
+    "order": 9
+  },
+  {
+    "id": "data-pipeline",
+    "title": "怎样持续给训练提供正确的数据？",
+    "stage": 3,
+    "order": 10
+  },
+  {
+    "id": "training-memory",
+    "title": "训练为什么比推理更占显存？",
+    "stage": 3,
+    "order": 11
+  },
+  {
+    "id": "checkpoints-finetuning",
+    "title": "怎样保存、恢复并微调真实模型？",
+    "stage": 3,
+    "order": 12
+  },
+  {
+    "id": "profiling",
+    "title": "怎样量到真正的瓶颈？",
+    "stage": 4,
+    "order": 13
+  },
+  {
+    "id": "kernel-lab",
+    "title": "一个算子怎样减少数据搬运？",
+    "stage": 4,
+    "order": 14
+  },
+  {
+    "id": "compilation",
+    "title": "编译器到底改变了哪些工作？",
+    "stage": 4,
+    "order": 15
+  },
+  {
+    "id": "collectives",
+    "title": "多张卡怎样得到一致的结果？",
+    "stage": 5,
+    "order": 16
+  },
+  {
+    "id": "topology",
+    "title": "数据从一张 GPU 到另一张要经过哪里？",
+    "stage": 5,
+    "order": 17
+  },
+  {
+    "id": "nccl",
+    "title": "通信怎样与计算正确地重叠？",
+    "stage": 5,
+    "order": 18
+  },
+  {
+    "id": "ddp",
+    "title": "多份模型怎样学成同一份参数？",
+    "stage": 6,
+    "order": 19
+  },
+  {
+    "id": "sharding",
+    "title": "模型状态装不下时，怎样分开存？",
+    "stage": 6,
+    "order": 20
+  },
+  {
+    "id": "model-parallel",
+    "title": "一层、一些层和专家分别怎样切分？",
+    "stage": 6,
+    "order": 21
+  },
+  {
+    "id": "recovery",
+    "title": "怎样让分布式训练可靠地继续？",
+    "stage": 6,
+    "order": 22
+  },
+  {
+    "id": "serving",
+    "title": "从模型文件到可测量的推理服务",
+    "stage": 7,
+    "order": 23
+  },
+  {
+    "id": "kv-allocation",
+    "title": "KV 显存怎样计数、分配和回收？",
+    "stage": 7,
+    "order": 24
+  },
+  {
+    "id": "scheduler",
+    "title": "请求怎样排队、补位与取消？",
+    "stage": 7,
+    "order": 25
+  },
+  {
+    "id": "cache-hierarchy",
+    "title": "缓存命中了，为什么仍然可能慢？",
+    "stage": 8,
+    "order": 26
+  },
+  {
+    "id": "quantization",
+    "title": "更少的位数怎样换来更小的模型？",
+    "stage": 8,
+    "order": 27
+  },
+  {
+    "id": "speculative-pd",
+    "title": "怎样改变生成和部署的执行方式？",
+    "stage": 8,
+    "order": 28
+  },
+  {
+    "id": "artifacts",
+    "title": "怎样管理数据、模型与运行环境？",
+    "stage": 9,
+    "order": 29
+  },
+  {
+    "id": "kubernetes",
+    "title": "训练与推理在集群里怎样运行？",
+    "stage": 9,
+    "order": 30
+  },
+  {
+    "id": "scheduling",
+    "title": "任务为什么有卡也不能立刻启动？",
+    "stage": 9,
+    "order": 31
+  },
+  {
+    "id": "dra",
+    "title": "一次设备请求怎样变成可用的 GPU？",
+    "stage": 9,
+    "order": 32
+  },
+  {
+    "id": "lws",
+    "title": "多进程推理怎样一起启动和恢复？",
+    "stage": 9,
+    "order": 33
+  },
+  {
+    "id": "observability",
+    "title": "怎样从用户请求追到模型与 GPU？",
+    "stage": 10,
+    "order": 34
+  },
+  {
+    "id": "diagnostics",
+    "title": "怎样用证据查清三个性能故障？",
+    "stage": 10,
+    "order": 35
+  },
+  {
+    "id": "delivery",
+    "title": "怎样验证、发布和撤回模型变更？",
+    "stage": 10,
+    "order": 36
+  },
+  {
+    "id": "economics",
+    "title": "怎样同时考虑质量、延迟与成本？",
+    "stage": 10,
+    "order": 37
+  },
+  {
+    "id": "workloads",
+    "title": "换一种模型，哪些经验仍然成立？",
+    "stage": 10,
+    "order": 38
+  }
+]

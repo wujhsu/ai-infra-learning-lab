@@ -1,79 +1,93 @@
 [
   {
     "id": "token",
-    "name": "Token",
-    "full": "词元",
-    "definition": "模型词表中的一个单位，输入时映射为整数 ID。它可能是一段文字、标点或字节片段。",
-    "example": "同一个汉字在不同分词器下不一定对应一个 token。",
-    "confused": "token 不等于汉字，也不等于单词。",
-    "lesson": "03-attention",
+    "name": "token",
+    "full": "Token，词元",
+    "definition": "分词器把文字转换成的单位。模型用它的整数编号接收输入、选择输出。",
+    "example": "教学词表把“北京”作为一个 token；这不是对真实模型分词结果的声明。",
+    "confused": "一个 token 不一定是一个汉字或一个单词。",
+    "lesson": "generation",
     "aliases": [
-      "词元",
-      "分词"
-    ]
+      "分词",
+      "词元"
+    ],
+    "path": "read/generation/",
+    "anchor": "tokens"
   },
   {
     "id": "tensor",
-    "name": "Tensor",
-    "full": "张量",
-    "definition": "带形状和数据类型的多维数组，是模型计算和存储的基本单位。",
-    "example": "形状 [2,3] 的张量有两行三列，共 6 个元素。",
-    "confused": "张量形状不决定字节数，还要乘每元素字节数。",
-    "lesson": "03-attention",
+    "name": "张量",
+    "full": "Tensor",
+    "definition": "有形状的数字数组。形状说明沿每个方向有多少项。",
+    "example": "四个 token、每个两个数字，对应形状 [4,2] 的数组。",
+    "confused": "[4,2] 描述形状，不是数组里只存了 4 和 2 两个数。",
+    "lesson": "representations",
     "aliases": [
-      "张量",
-      "shape"
-    ]
+      "shape",
+      "张量"
+    ],
+    "path": "read/representations/",
+    "anchor": "shape"
   },
   {
     "id": "attention",
-    "name": "Attention",
-    "full": "注意力机制",
-    "definition": "用查询 Q 与历史键 K 的匹配程度计算权重，再对值 V 加权求和。",
-    "example": "读到‘它’时，不同历史位置对当前表示的贡献不同。",
-    "confused": "注意力权重不是对人类推理过程的完整解释。",
-    "lesson": "03-attention",
+    "name": "注意力机制",
+    "full": "Attention",
+    "definition": "让当前位置根据匹配程度，从允许访问的位置汇总信息的一组计算。",
+    "example": "对“北京”和“是”的数值表示分别取一定比例，再相加得到新表示。",
+    "confused": "注意力比例不是答案概率，也不能直接当成人类推理过程的解释。",
+    "lesson": "attention",
     "aliases": [
-      "注意力",
-      "QKV"
-    ]
+      "QKV",
+      "注意力"
+    ],
+    "path": "read/attention/",
+    "anchor": "weighted-sum"
   },
   {
     "id": "prefill",
     "name": "Prefill",
-    "full": "提示词预填充",
-    "definition": "处理当前输入前缀，构建各层的 K/V，并得到用于首次采样的输出。",
-    "example": "把 8,000 个输入 token 送入模型，通常可并行处理多个位置。",
-    "confused": "Prefill 不包含服务外所有排队和网络耗时。",
-    "lesson": "07-latency",
+    "full": "Prefill，提示词预填充",
+    "definition": "处理已有的整段输入，建立其 KV，并用最后位置的输出决定第一个新 token 的阶段。",
+    "example": "先处理“北京是中国的”四个位置，再选出“首都”。",
+    "confused": "首 token 的等待还可能含排队等开销，不能全部归于 Prefill。",
+    "lesson": "kv-reuse",
     "aliases": [
       "预填充"
-    ]
+    ],
+    "path": "read/kv-reuse/",
+    "anchor": "phases"
   },
   {
     "id": "decode",
     "name": "Decode",
-    "full": "逐步解码",
-    "definition": "基于已有上下文执行后续生成步骤；普通自回归路径每个序列每步产生一个新 token。",
-    "example": "上一步生成的 token 进入下一次模型前向计算。",
-    "confused": "推测解码可能一次接受多个 token；基础模型先不涉及它。",
-    "lesson": "07-latency",
+    "full": "Decode，增量生成阶段",
+    "definition": "在已有 KV 的基础上处理新输入位置，继续决定下一个 token。",
+    "example": "处理刚生成的“首都”并把它的 K/V 加入缓存，再决定下一项。",
+    "confused": "这里的 Decode 是引擎执行阶段，不等同于把 token ID 还原成文本的解码操作。",
+    "lesson": "kv-reuse",
     "aliases": [
-      "解码"
-    ]
+      "解码",
+      "解码阶段"
+    ],
+    "path": "read/kv-reuse/",
+    "anchor": "phases"
   },
   {
     "id": "kv-cache",
     "name": "KV Cache",
-    "full": "Key / Value Cache，键值缓存",
-    "definition": "保存历史 token 在各注意力层的 K/V，后续生成复用这些中间结果。",
-    "example": "第三轮对话复用相同前缀的缓存，省掉相应 Prefill 计算。",
-    "confused": "不是最终回答缓存；仍需读取历史 K/V 做注意力。",
-    "lesson": "09-kv-memory",
+    "full": "Key/Value Cache，键值缓存",
+    "definition": "保留已经处理过的位置在各层产生的 K/V，供后续生成读取。",
+    "example": "处理完“北京是中国的”后，保留这四个位置的 K/V；处理“首都”时追加一个位置。",
+    "confused": "不是回答文本缓存；模型权重与每个请求的 KV 也不是同一份数据。",
+    "lesson": "kv-reuse",
     "aliases": [
-      "KVCache",
-      "键值缓存"
-    ]
+      "KV 缓存",
+      "键值缓存",
+      "KV Cache"
+    ],
+    "path": "read/kv-reuse/",
+    "anchor": "two-rounds"
   },
   {
     "id": "ttft",
@@ -82,11 +96,12 @@
     "definition": "从约定的请求起点，到观察到首个输出 token 的时间。必须明确客户端还是服务端口径。",
     "example": "请求等待 8 秒、处理 6 秒，用户首 token 延迟不会只有 6 秒。",
     "confused": "首个 SSE 消息可能只是角色信息，不是输出 token。",
-    "lesson": "07-latency",
+    "lesson": "scheduler",
     "aliases": [
       "首字延迟",
       "首Token延迟"
-    ]
+    ],
+    "path": "read/scheduler/"
   },
   {
     "id": "tpot",
@@ -95,10 +110,11 @@
     "definition": "通常以首次输出之后的生成时间除以后续输出 token 数，衡量平均生成速度。",
     "example": "首 token 后 9 个 token 用 0.45 秒，平均为 50 毫秒。",
     "confused": "平均 TPOT 可能掩盖一次很长的停顿。",
-    "lesson": "07-latency",
+    "lesson": "scheduler",
     "aliases": [
       "平均输出延迟"
-    ]
+    ],
+    "path": "read/scheduler/"
   },
   {
     "id": "itl",
@@ -107,10 +123,11 @@
     "definition": "相邻输出 token 时间戳之差；分布反映流式输出的抖动。",
     "example": "间隔 20、20、500 毫秒时，500 毫秒停顿值得单独调查。",
     "confused": "网络 chunk 可包含多个 token，chunk 间隔不能直接冒充 ITL。",
-    "lesson": "07-latency",
+    "lesson": "scheduler",
     "aliases": [
       "token间隔"
-    ]
+    ],
+    "path": "read/scheduler/"
   },
   {
     "id": "throughput",
@@ -119,37 +136,33 @@
     "definition": "单位时间完成的有效工作量，需要说明是请求还是输入/输出 token。",
     "example": "每秒输出 1,000 token 是系统总吞吐，不代表每个用户都这么快。",
     "confused": "高吞吐可能伴随较差的尾延迟。",
-    "lesson": "08-batching",
+    "lesson": "scheduler",
     "aliases": [
       "吞吐"
-    ]
+    ],
+    "path": "read/scheduler/"
   },
   {
     "id": "slo",
-    "name": "SLO",
-    "full": "Service Level Objective，服务等级目标",
-    "definition": "在一个时间窗口内，对可测量的服务表现设定的目标。",
-    "example": "测试目标可写为 95% 请求 TTFT 小于 2 秒，并说明负载。",
-    "confused": "示例目标不是行业统一标准，也不等于合同 SLA。",
-    "lesson": "19-signals",
-    "aliases": [
-      "服务目标",
-      "尾延迟",
-      "p95"
-    ]
+    "name": "服务目标",
+    "full": "Service Level Objective",
+    "definition": "在明确时间窗口与请求范围内，对服务表现设定的目标。",
+    "example": "过去一天有效请求中，99% 在规定时间内开始输出。",
+    "confused": "SLO 是目标；某次测得的平均延迟不是目标达成证明。",
+    "lesson": "economics",
+    "path": "read/economics/",
+    "aliases": []
   },
   {
     "id": "batch",
-    "name": "Continuous Batching",
-    "full": "连续批处理",
-    "definition": "推理引擎在执行步骤间让完成请求退出、新请求加入批次。",
-    "example": "短请求完成后，空出来的处理位置可以接纳另一个请求。",
-    "confused": "不是无限增加 batch；KV、算力和调度预算都有限。",
-    "lesson": "08-batching",
-    "aliases": [
-      "batch",
-      "连续批处理"
-    ]
+    "name": "批次",
+    "full": "Batch",
+    "definition": "一次组织起来交给模型处理的一组样本。",
+    "example": "一次读取 8 条序列，模型张量的第一维就可能为 8。",
+    "confused": "批次大小、序列长度和优化器更新频率是不同维度。",
+    "lesson": "data-pipeline",
+    "path": "read/data-pipeline/",
+    "aliases": []
   },
   {
     "id": "gpu",
@@ -158,11 +171,12 @@
     "definition": "拥有大量并行执行单元的加速器，适合规则的数据并行计算。",
     "example": "矩阵乘法可让许多线程同时处理不同输出块。",
     "confused": "GPU 忙并不说明模型有效计算比例高。",
-    "lesson": "04-hardware",
+    "lesson": "gpu-memory",
     "aliases": [
       "显卡",
       "加速器"
-    ]
+    ],
+    "path": "read/gpu-memory/"
   },
   {
     "id": "hbm",
@@ -171,11 +185,12 @@
     "definition": "一些数据中心 GPU 使用的设备侧内存，存放权重、激活、KV 等数据。",
     "example": "权重和 KV 都需要占用 GPU 可用显存预算。",
     "confused": "不是所有 GPU 都采用 HBM；寄存器和共享内存更靠近计算单元。",
-    "lesson": "04-hardware",
+    "lesson": "gpu-memory",
     "aliases": [
       "显存",
       "高带宽内存"
-    ]
+    ],
+    "path": "read/gpu-memory/"
   },
   {
     "id": "kernel",
@@ -184,23 +199,23 @@
     "definition": "由许多 GPU 线程并行执行的一段程序，通常由 CPU 发起或通过图执行。",
     "example": "一次矩阵乘法可以由一个或多个 kernel 完成。",
     "confused": "这里不是 Linux 内核。",
-    "lesson": "05-pytorch",
+    "lesson": "tensor-runtime",
     "aliases": [
       "核函数",
       "kernel launch"
-    ]
+    ],
+    "path": "read/tensor-runtime/"
   },
   {
     "id": "bandwidth",
-    "name": "Bandwidth",
-    "full": "带宽",
-    "definition": "单位时间能够传输的数据量，例如 GB/s。",
-    "example": "搬 8 GB 数据，以有效 80 GB/s 传输，理想传输时间为 0.1 秒。",
-    "confused": "带宽不同于一次小传输的启动延迟。",
-    "lesson": "04-hardware",
-    "aliases": [
-      "带宽"
-    ]
+    "name": "带宽",
+    "full": "Bandwidth",
+    "definition": "单位时间内能够传输的数据量。",
+    "example": "传输 4 GB 数据，有效带宽 20 GB/s 时仅传输部分约需 0.2 秒。",
+    "confused": "容量表示能放多少；带宽表示每秒能搬多少。",
+    "lesson": "gpu-memory",
+    "path": "read/gpu-memory/",
+    "aliases": []
   },
   {
     "id": "roofline",
@@ -209,11 +224,12 @@
     "definition": "用计算峰值和内存带宽约束估计性能上限，关键量是每字节执行多少运算。",
     "example": "运算量不变却减少内存读写，可能让算子远离带宽瓶颈。",
     "confused": "理论上限不是性能承诺，需要有效带宽和准确流量统计。",
-    "lesson": "04-hardware",
+    "lesson": "gpu-memory",
     "aliases": [
       "屋顶线",
       "操作强度"
-    ]
+    ],
+    "path": "read/gpu-memory/"
   },
   {
     "id": "pod",
@@ -222,10 +238,11 @@
     "definition": "共同调度的一组容器，共享网络身份，并可共享存储卷。",
     "example": "应用容器与日志 sidecar 可以位于同一个 Pod。",
     "confused": "Pod 不是虚拟机，也不是稳定不变的服务器。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "容器组"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "controller",
@@ -234,20 +251,22 @@
     "definition": "持续观察实际状态，并执行操作使其接近期望状态的控制循环。",
     "example": "期望有两个副本，少一个时控制器创建新的 Pod。",
     "confused": "控制器通常不处理每一个推理请求。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "控制器",
       "reconciliation"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "rank",
-    "name": "Rank",
-    "full": "通信参与者编号",
-    "definition": "通信组中某个参与进程的标识，范围通常为 0 到 world size 减一。",
-    "example": "4 个进程的 rank 可以是 0、1、2、3。",
-    "confused": "rank 不天然等于节点编号，常见配置是一进程一 GPU。",
-    "lesson": "14-collectives",
+    "name": "rank",
+    "full": "Rank，进程编号",
+    "definition": "通信组中标识一个参与进程的编号。",
+    "example": "四个进程的全局 rank 可为 0、1、2、3；每台机器还可能有本地编号。",
+    "confused": "rank 是进程身份，不天然等于 GPU 编号或节点编号。",
+    "lesson": "collectives",
+    "path": "read/collectives/",
     "aliases": [
       "world size"
     ]
@@ -259,10 +278,11 @@
     "definition": "用于 NVIDIA GPU 间集合通信和点对点通信的库。",
     "example": "数据并行训练通过 AllReduce 汇总梯度。",
     "confused": "不是模型分片策略本身；上层决定什么时候通信什么。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "集合通信"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "allreduce",
@@ -271,10 +291,11 @@
     "definition": "把所有参与者的数组按指定运算归约，并让每个参与者得到结果。",
     "example": "两卡分别有 [1,2] 和 [3,4]，求和后两卡都获得 [4,6]。",
     "confused": "AllGather 是收集拼接，不会自动求和。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "全归约"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "tp",
@@ -283,10 +304,11 @@
     "definition": "将同一层的张量计算拆到多个设备上，按分片方式交换中间结果。",
     "example": "把一个线性层权重按输出维度分列。",
     "confused": "TP 需要层内通信；不等于复制整个模型。",
-    "lesson": "13-parallelism",
+    "lesson": "model-parallel",
     "aliases": [
       "张量并行"
-    ]
+    ],
+    "path": "read/model-parallel/"
   },
   {
     "id": "pp",
@@ -295,10 +317,11 @@
     "definition": "将模型不同层放在不同设备阶段，阶段之间传递激活。",
     "example": "前一组 GPU 执行前半层，后一组执行后半层。",
     "confused": "流水线空泡会影响利用率。",
-    "lesson": "13-parallelism",
+    "lesson": "model-parallel",
     "aliases": [
       "流水线并行"
-    ]
+    ],
+    "path": "read/model-parallel/"
   },
   {
     "id": "dp",
@@ -307,10 +330,11 @@
     "definition": "多个模型副本处理不同数据；训练还要同步梯度，推理副本通常独立处理请求。",
     "example": "两份推理模型分别服务不同请求。",
     "confused": "训练 DP 与推理副本的同步需求不同。",
-    "lesson": "13-parallelism",
+    "lesson": "model-parallel",
     "aliases": [
       "数据并行"
-    ]
+    ],
+    "path": "read/model-parallel/"
   },
   {
     "id": "ep",
@@ -319,11 +343,12 @@
     "definition": "将 MoE 的专家放到不同设备，token 按路由结果发送给选中的专家。",
     "example": "token 的输入被 dispatch 到专家所在 GPU，再 combine 输出。",
     "confused": "一个 token 不一定经过所有专家。",
-    "lesson": "13-parallelism",
+    "lesson": "model-parallel",
     "aliases": [
       "专家并行",
       "MoE"
-    ]
+    ],
+    "path": "read/model-parallel/"
   },
   {
     "id": "numa",
@@ -332,11 +357,12 @@
     "definition": "CPU 访问本地与远端内存/设备时路径和代价不同的拓扑。",
     "example": "GPU 和 NIC 靠近同一 CPU 插槽可能减少跨插槽传输。",
     "confused": "NUMA 相同不保证所有路径性能完全相同。",
-    "lesson": "16-gpu-scheduling",
+    "lesson": "scheduling",
     "aliases": [
       "拓扑",
       "亲和性"
-    ]
+    ],
+    "path": "read/scheduling/"
   },
   {
     "id": "rdma",
@@ -345,11 +371,12 @@
     "definition": "允许网卡参与跨机器内存传输、减少 CPU 介入的一组机制。",
     "example": "多节点 GPU 通信可使用支持 RDMA 的网络路径。",
     "confused": "存在 RDMA 网卡不代表 GPU Direct 路径已生效。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "远程直接内存访问",
       "NIC"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "lsa",
@@ -358,10 +385,11 @@
     "definition": "NCCL Device API 中能以加载/存储访问的对端内存路径，要求相应 P2P 能力。",
     "example": "通过对端 window offset 取得可访问指针。",
     "confused": "不只等于 NVLink，也不保证任意 PCIe GPU 都可用。",
-    "lesson": "15-nccl",
+    "lesson": "nccl",
     "aliases": [
       "P2P"
-    ]
+    ],
+    "path": "read/nccl/"
   },
   {
     "id": "gin",
@@ -370,10 +398,11 @@
     "definition": "GPU kernel 发起网络通信的 NCCL Device API 能力。",
     "example": "发送数据后使用 signal 与等待机制交接数据可用性。",
     "confused": "本地发起或完成不等于远端已经可以消费。",
-    "lesson": "15-nccl",
+    "lesson": "nccl",
     "aliases": [
       "设备发起通信"
-    ]
+    ],
+    "path": "read/nccl/"
   },
   {
     "id": "dra",
@@ -382,24 +411,11 @@
     "definition": "Kubernetes 用结构化设备库存和资源声明进行分配、准备与状态管理的机制。",
     "example": "请求具备特定属性的 GPU，并约束与 NIC 的拓扑。",
     "confused": "不是旧 Device Plugin 的简单改名。",
-    "lesson": "17-dra",
+    "lesson": "dra",
     "aliases": [
       "动态资源分配"
-    ]
-  },
-  {
-    "id": "claim",
-    "name": "ResourceClaim",
-    "full": "资源声明",
-    "definition": "DRA 中描述设备请求并承载分配结果的对象，Pod 可以引用它。",
-    "example": "请求一个符合 DeviceClass 规则的设备。",
-    "confused": "创建 Claim 不代表设备已经完成节点准备。",
-    "lesson": "17-dra",
-    "aliases": [
-      "资源声明",
-      "DeviceClass",
-      "ResourceSlice"
-    ]
+    ],
+    "path": "read/dra/"
   },
   {
     "id": "lws",
@@ -408,11 +424,12 @@
     "definition": "管理 leader 与 worker Pod 工作组的 Kubernetes 扩展 API。",
     "example": "一个模型副本由 leader 与多个 worker 协作提供服务。",
     "confused": "LWS 不自动证明 NCCL 网络健康，也不自动选择所有并行参数。",
-    "lesson": "18-lws",
+    "lesson": "lws",
     "aliases": [
       "LeaderWorkerSet",
       "工作组"
-    ]
+    ],
+    "path": "read/lws/"
   },
   {
     "id": "trace",
@@ -421,12 +438,13 @@
     "definition": "由相关 span 组成的一次执行链路，描述操作时序和父子关系。",
     "example": "网关与推理引擎传播 trace context 后可以关联阶段。",
     "confused": "共享 GPU 上的利用率不能直接当成某一请求的专属消耗。",
-    "lesson": "20-correlation",
+    "lesson": "observability",
     "aliases": [
       "追踪",
       "span",
       "TraceID"
-    ]
+    ],
+    "path": "read/observability/"
   },
   {
     "id": "canary",
@@ -435,11 +453,12 @@
     "definition": "先让少量流量进入新版本，用观察结果决定继续、暂停或回滚。",
     "example": "新版本先接收 10% 请求，检测异常后停止放量。",
     "confused": "10% 副本不一定意味着精确 10% 流量，需要路由支持。",
-    "lesson": "22-canary",
+    "lesson": "delivery",
     "aliases": [
       "灰度发布",
       "金丝雀"
-    ]
+    ],
+    "path": "read/delivery/"
   },
   {
     "id": "gitops",
@@ -448,10 +467,11 @@
     "definition": "把期望配置保存在版本控制中，由控制器协调集群与声明的一致性。",
     "example": "修复通过 PR、审核和合并改变声明，再由控制器部署。",
     "confused": "直接改集群可能被协调回 Git 中状态。",
-    "lesson": "23-agent-repair",
+    "lesson": "delivery",
     "aliases": [
       "渐进交付"
-    ]
+    ],
+    "path": "read/delivery/"
   },
   {
     "id": "container",
@@ -460,10 +480,11 @@
     "definition": "用操作系统隔离和资源限制来运行应用进程的环境，通常共享宿主内核。",
     "example": "同一个镜像可以在两台机器上启动两个独立容器。",
     "confused": "镜像是模板，容器是运行实例；容器不是一台独立内核的虚拟机。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "容器"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "image",
@@ -472,11 +493,12 @@
     "definition": "包含应用文件、依赖与启动配置的可分发模板。",
     "example": "固定 image@sha256 可以明确本次实验使用哪个镜像内容。",
     "confused": "标签可以变化，digest 指向内容；模型权重不一定包含在镜像里。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "镜像",
       "digest"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "node",
@@ -485,10 +507,11 @@
     "definition": "承载 Pod 的工作机器，可以是物理机或虚拟机。",
     "example": "一台配有 8 张 GPU 的机器可以作为一个 Kubernetes 节点。",
     "confused": "节点不等于 Pod，也不等于单张 GPU。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "节点"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "deployment",
@@ -497,10 +520,11 @@
     "definition": "管理一组副本 Pod 的期望状态，并支持模板变更后的滚动更新。",
     "example": "期望 3 个服务副本，一个退出后控制器创建替代实例。",
     "confused": "普通副本控制不自动提供 LWS 的整组推理启动语义。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "部署控制器"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "service",
@@ -509,11 +533,12 @@
     "definition": "为一组后端提供相对稳定的访问入口，通过选择器等关联端点。",
     "example": "客户端访问服务名，由集群把请求送到符合条件的后端。",
     "confused": "Service 不是实际执行推理的进程；就绪端点也不保证业务延迟达标。",
-    "lesson": "02-kubernetes",
+    "lesson": "kubernetes",
     "aliases": [
       "服务",
       "服务发现"
-    ]
+    ],
+    "path": "read/kubernetes/"
   },
   {
     "id": "namespace",
@@ -522,10 +547,11 @@
     "definition": "在同一个集群中为名称和资源管理提供逻辑范围。",
     "example": "把可删除的实验对象放在 inference-lab 中，方便集中查看。",
     "confused": "命名空间不是完整安全隔离；删除它会删除其中资源。",
-    "lesson": "16-gpu-scheduling",
+    "lesson": "scheduling",
     "aliases": [
       "命名空间"
-    ]
+    ],
+    "path": "read/scheduling/"
   },
   {
     "id": "dtype",
@@ -534,11 +560,12 @@
     "definition": "决定张量元素的表示方式、精度范围和字节占用。",
     "example": "FP32 元素通常 4 字节，BF16 和 FP16 通常 2 字节。",
     "confused": "相同字节数不代表相同数值范围或精度。",
-    "lesson": "03-attention",
+    "lesson": "attention",
     "aliases": [
       "数据类型",
       "精度"
-    ]
+    ],
+    "path": "read/attention/"
   },
   {
     "id": "gqa",
@@ -547,11 +574,12 @@
     "definition": "让多组 Query heads 共享较少的 Key/Value heads 的注意力结构。",
     "example": "32 个查询头、8 个 KV 头时，缓存公式用 8 个 KV 头。",
     "confused": "不能把查询头数量直接代入所有模型的 KV 容量公式。",
-    "lesson": "09-kv-memory",
+    "lesson": "kv-allocation",
     "aliases": [
       "分组查询注意力",
       "KV heads"
-    ]
+    ],
+    "path": "read/kv-allocation/"
   },
   {
     "id": "moe",
@@ -560,10 +588,11 @@
     "definition": "通过路由为每个输入选择部分专家网络参与计算的模型结构。",
     "example": "某个 token 只经过选中的两个专家，而非所有专家。",
     "confused": "稀疏激活不意味着没有通信成本；专家分布可能导致负载不均。",
-    "lesson": "13-parallelism",
+    "lesson": "model-parallel",
     "aliases": [
       "混合专家"
-    ]
+    ],
+    "path": "read/model-parallel/"
   },
   {
     "id": "pcie",
@@ -572,10 +601,11 @@
     "definition": "连接 CPU 与外设等组件的一类互连技术。",
     "example": "CPU 主存中的数据通过一条支持的路径搬到 GPU。",
     "confused": "接口代际和链路宽度影响带宽；标称双向总带宽不是单次传输的有效带宽。",
-    "lesson": "04-hardware",
+    "lesson": "gpu-memory",
     "aliases": [
       "PCI Express"
-    ]
+    ],
+    "path": "read/gpu-memory/"
   },
   {
     "id": "nvlink",
@@ -584,10 +614,11 @@
     "definition": "NVIDIA 的高速互连技术，常见于特定 GPU 间以及支持的平台中。",
     "example": "支持的多 GPU 平台可能通过 NVLink 交换数据。",
     "confused": "并不是所有 GPU 对、服务器或 NIC 都直接通过 NVLink 相连。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "高速互连"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "nic",
@@ -596,10 +627,11 @@
     "definition": "让机器接入网络的设备，通常称网卡。",
     "example": "跨主机的 GPU 通信可能经过各自的 NIC 和网络交换机。",
     "confused": "网卡能力与端到端实际带宽不同，还受拓扑、协议和共享负载影响。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "网卡"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "sm",
@@ -608,10 +640,11 @@
     "definition": "NVIDIA GPU 中调度和执行线程块的计算单元。",
     "example": "一个 kernel 的许多线程块分布到多个 SM 上执行。",
     "confused": "SM 不是整张 GPU，也不能仅凭 SM 数推断应用速度。",
-    "lesson": "05-pytorch",
+    "lesson": "tensor-runtime",
     "aliases": [
       "流式多处理器"
-    ]
+    ],
+    "path": "read/tensor-runtime/"
   },
   {
     "id": "stream",
@@ -620,11 +653,12 @@
     "definition": "按序提交设备操作的队列；不同流之间可以有并行机会。",
     "example": "计算流等待一个事件后再读取通信流写入的数据。",
     "confused": "不同 stream 不自动保证并行，也不会自动消除数据依赖。",
-    "lesson": "15-nccl",
+    "lesson": "nccl",
     "aliases": [
       "执行流",
       "事件"
-    ]
+    ],
+    "path": "read/nccl/"
   },
   {
     "id": "allgather",
@@ -633,10 +667,11 @@
     "definition": "每个 rank 贡献自己的数据片段，最终每个 rank 都获得所有片段。",
     "example": "rank 0 有 A、rank 1 有 B，结束后两者都有 A 和 B。",
     "confused": "它进行收集，不做求和等归约运算。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "全收集"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "reducescatter",
@@ -645,10 +680,11 @@
     "definition": "先对对应位置归约，再把归约结果的不同片段分给各个 rank。",
     "example": "两个 rank 对向量求和后，各自保留结果的一半。",
     "confused": "单个 rank 不会像 AllReduce 那样得到整个归约结果。",
-    "lesson": "14-collectives",
+    "lesson": "collectives",
     "aliases": [
       "归约分散"
-    ]
+    ],
+    "path": "read/collectives/"
   },
   {
     "id": "barrier",
@@ -657,36 +693,12 @@
     "definition": "要求一组参与者到达约定位置后，才允许按规则继续。",
     "example": "所有 rank 完成某一准备阶段后，再进入下一阶段。",
     "confused": "控制流到达屏障与数据可见性需要结合具体 API 语义，不可随意互换。",
-    "lesson": "15-nccl",
+    "lesson": "nccl",
     "aliases": [
       "屏障",
       "同步"
-    ]
-  },
-  {
-    "id": "resourceslice",
-    "name": "ResourceSlice",
-    "full": "ResourceSlice，设备库存切片",
-    "definition": "DRA 驱动发布设备信息的 Kubernetes 资源；多个切片可共同描述库存。",
-    "example": "某个驱动声明节点上有两张具备特定属性的 GPU。",
-    "confused": "库存记录不是某个 Pod 的分配凭证。",
-    "lesson": "17-dra",
-    "aliases": [
-      "资源切片",
-      "设备库存"
-    ]
-  },
-  {
-    "id": "deviceclass",
-    "name": "DeviceClass",
-    "full": "DeviceClass，设备类",
-    "definition": "DRA 中用于描述选择设备规则的集群级资源。",
-    "example": "管理员定义一个设备类，使请求可以选择合适驱动的设备。",
-    "confused": "实际属性名由驱动定义，不能从某个演示名字推断所有驱动都支持。",
-    "lesson": "17-dra",
-    "aliases": [
-      "设备类"
-    ]
+    ],
+    "path": "read/nccl/"
   },
   {
     "id": "cdi",
@@ -695,23 +707,11 @@
     "definition": "用规范化配置描述向容器注入设备访问所需信息的接口。",
     "example": "设备驱动准备完成后，运行时可使用 CDI 配置提供设备节点等资源。",
     "confused": "分配设备、准备设备与容器可用属于不同步骤。",
-    "lesson": "17-dra",
+    "lesson": "dra",
     "aliases": [
       "容器设备接口"
-    ]
-  },
-  {
-    "id": "metric",
-    "name": "Metric",
-    "full": "Metric，指标",
-    "definition": "按时间记录的数值测量，适合汇总系统行为。",
-    "example": "请求延迟直方图帮助观察一段时间内的分布。",
-    "confused": "给每个 request ID 建标签会制造高基数，不适合常规聚合指标。",
-    "lesson": "19-signals",
-    "aliases": [
-      "指标",
-      "高基数"
-    ]
+    ],
+    "path": "read/dra/"
   },
   {
     "id": "span",
@@ -720,10 +720,11 @@
     "definition": "Trace 中表示一段操作及其起止时间、属性和父子关联的记录。",
     "example": "gateway span 可以关联同一请求的引擎处理 span。",
     "confused": "一个 span 不是一条 GPU 指令，也不天然解释所有时间空隙。",
-    "lesson": "20-correlation",
+    "lesson": "observability",
     "aliases": [
       "追踪跨度"
-    ]
+    ],
+    "path": "read/observability/"
   },
   {
     "id": "sse",
@@ -732,11 +733,12 @@
     "definition": "服务器通过持续 HTTP 响应向客户端发送事件的格式与机制。",
     "example": "流式模型接口用多个 data 事件逐步返回回答。",
     "confused": "一个事件可以没有文本，也可以包含多个 token；chunk 间隔不等于 token 间隔。",
-    "lesson": "07-latency",
+    "lesson": "scheduler",
     "aliases": [
       "流式事件",
       "Server-Sent Events"
-    ]
+    ],
+    "path": "read/scheduler/"
   },
   {
     "id": "keps",
@@ -745,10 +747,591 @@
     "definition": "用于描述设计动机、方案和演进计划的上游提案。",
     "example": "DRA 某项能力在 KEP 中讨论，不代表你的集群版本已经启用。",
     "confused": "提案合并、代码合并、正式发布和默认开启是不同状态。",
-    "lesson": "17-dra",
+    "lesson": "dra",
     "aliases": [
       "KEP",
       "增强提案"
+    ],
+    "path": "read/dra/"
+  },
+  {
+    "id": "vocabulary",
+    "name": "词表",
+    "full": "Vocabulary",
+    "definition": "模型能接收和输出的 token 与其编号的对应表。",
+    "example": "本例“北京”的 ID 是 0，“首都”的 ID 是 4。",
+    "confused": "编号只是身份，不表示词义远近或概率大小。",
+    "lesson": "generation",
+    "path": "read/generation/",
+    "anchor": "tokens",
+    "aliases": [
+      "vocab"
+    ]
+  },
+  {
+    "id": "tokenizer",
+    "name": "分词器",
+    "full": "Tokenizer",
+    "definition": "按照与模型配套的规则，把文本转换为 token ID，并把输出 ID 解码为文本的组件。",
+    "example": "本例“北京是中国的”按手工词表变成 [0,1,2,3]。",
+    "confused": "教学切分不能用于推断实际 tokenizer 的输出；聊天角色标记也可能占 token。",
+    "lesson": "generation",
+    "path": "read/generation/",
+    "anchor": "tokens",
+    "aliases": [
+      "分词"
+    ]
+  },
+  {
+    "id": "parameters",
+    "name": "模型参数",
+    "full": "Model Parameters / Weights",
+    "definition": "训练得到、推理计算时反复使用的一组数值。它们规定输入数字如何被转换。",
+    "example": "下一章的一张小表给每个 token 提供两个数字，这张表也是参数的一部分。",
+    "confused": "输入更长不会自动增加参数数量；一次普通生成也不会把新对话训练进参数。",
+    "lesson": "generation",
+    "path": "read/generation/",
+    "anchor": "model-box",
+    "aliases": [
+      "weights",
+      "参数",
+      "权重"
+    ]
+  },
+  {
+    "id": "logits",
+    "name": "候选得分",
+    "full": "Logits",
+    "definition": "模型为每个候选 token 计算的原始数值，用来决定下一步输出；还不是概率。",
+    "example": "七个词的教学词表对应七个得分；即使本轮只选一个 token，也要区分这七个候选。",
+    "confused": "得分可为负，不必相加等于 1；转为概率需要另一项计算。",
+    "lesson": "generation",
+    "path": "read/generation/",
+    "anchor": "scores",
+    "aliases": [
+      "logit"
+    ]
+  },
+  {
+    "id": "sampling",
+    "name": "采样",
+    "full": "Sampling",
+    "definition": "按概率分布选择一个候选的过程。",
+    "example": "候选“首都”的概率若为 80%，不代表每次一定选到它。",
+    "confused": "每次选最高分叫贪心选择，不等同于按概率随机采样。",
+    "lesson": "generation",
+    "path": "read/generation/",
+    "anchor": "scores",
+    "aliases": []
+  },
+  {
+    "id": "autoregressive",
+    "name": "自回归生成",
+    "full": "Autoregressive Generation",
+    "definition": "把已经生成的内容接回输入，反复预测下一项的生成方式。",
+    "example": "先接上“首都”，再根据含“首都”的上下文决定后面的标点。",
+    "confused": "基本逐 token 循环并不是一次算好整句后故意慢慢显示。",
+    "lesson": "generation",
+    "path": "read/generation/",
+    "anchor": "one-step",
+    "aliases": [
+      "自回归"
+    ]
+  },
+  {
+    "id": "vector",
+    "name": "向量",
+    "full": "Vector",
+    "definition": "按固定顺序排列的一组数字；在这里用来表示一个位置的信息。",
+    "example": "[1,0] 有两个分量，[0,1] 也有两个分量，但数值不同。",
+    "confused": "分量一般没有“城市”“国家”这样的固定人类标签。",
+    "lesson": "representations",
+    "path": "read/representations/",
+    "anchor": "vectors",
+    "aliases": []
+  },
+  {
+    "id": "embedding",
+    "name": "嵌入表示",
+    "full": "Embedding",
+    "definition": "为 token ID 查出一个可参与计算的向量；提供这些向量的表属于模型参数。",
+    "example": "ID 0 在教学表中对应 [1,0]；ID 2 对应 [1,1]。",
+    "confused": "初始 token 向量与经过上下文计算后的表示不同。",
+    "lesson": "representations",
+    "path": "read/representations/",
+    "anchor": "embedding",
+    "aliases": [
+      "词嵌入"
+    ]
+  },
+  {
+    "id": "matmul",
+    "name": "矩阵乘法",
+    "full": "Matrix Multiplication",
+    "definition": "把左边的一行与右边的一列逐项相乘再相加，以此构成输出矩阵。",
+    "example": "[1,1] 乘 [[2,0],[0,1]] 得到 [2,1]。",
+    "confused": "它通常不是把相同位置的两个数逐项相乘。",
+    "lesson": "representations",
+    "path": "read/representations/",
+    "anchor": "matrix",
+    "aliases": [
+      "矩阵"
+    ]
+  },
+  {
+    "id": "hidden-state",
+    "name": "中间表示",
+    "full": "Hidden State / Activation",
+    "definition": "输入在模型计算过程中产生的数值；下一步计算会继续读取和转换它。",
+    "example": "同一个“的”在不同前文之后，经过 Attention 得到的数值可以不同。",
+    "confused": "它来自本次计算，不等同于训练后固定的权重。",
+    "lesson": "representations",
+    "path": "read/representations/",
+    "anchor": "layers",
+    "aliases": [
+      "激活",
+      "隐藏状态"
+    ]
+  },
+  {
+    "id": "forward",
+    "name": "前向计算",
+    "full": "Forward Pass",
+    "definition": "沿模型定义的运算顺序，从输入计算到输出的过程。",
+    "example": "查词向量、经过各层、得到候选得分，组成一次前向计算。",
+    "confused": "一次前向计算不等于完成整段回答，也不意味着更新模型参数。",
+    "lesson": "representations",
+    "path": "read/representations/",
+    "anchor": "layers",
+    "aliases": [
+      "前向传播"
+    ]
+  },
+  {
+    "id": "training",
+    "name": "训练",
+    "full": "Training",
+    "definition": "用数据与目标比较模型输出，再调整参数，使模型逐步学会所需行为的过程。",
+    "example": "训练会更新嵌入表等数值；普通推理读取这些已确定的数值。",
+    "confused": "把文字放入当前上下文，不等于对模型进行训练。",
+    "lesson": "representations",
+    "path": "read/representations/",
+    "anchor": "training",
+    "aliases": [
+      "inference",
+      "推理"
+    ]
+  },
+  {
+    "id": "query",
+    "name": "查询向量 Q",
+    "full": "Query",
+    "definition": "当前位置用于与各位置的 K 比较的数字向量。",
+    "example": "教学例子中“是”的 Q=[0,1]，它与两个位置的 K 分别做点积。",
+    "confused": "这里的查询不是用户发来的整句 HTTP 请求。",
+    "lesson": "attention",
+    "path": "read/attention/",
+    "anchor": "qkv",
+    "aliases": [
+      "Q"
+    ]
+  },
+  {
+    "id": "key",
+    "name": "键向量 K",
+    "full": "Key",
+    "definition": "每个位置提供的、用来与 Q 计算匹配得分的向量。",
+    "example": "“北京”的 K=[1,0]；Q 会读取它来计算该位置的匹配程度。",
+    "confused": "它不是数据库键，也不是 token 的整数 ID。",
+    "lesson": "attention",
+    "path": "read/attention/",
+    "anchor": "qkv",
+    "aliases": [
+      "K"
+    ]
+  },
+  {
+    "id": "value",
+    "name": "值向量 V",
+    "full": "Value",
+    "definition": "匹配权重确定后，真正参与加权汇总的数值向量。",
+    "example": "“北京”的 V=[2,0]；若权重为三分之一，它贡献约 [0.67,0]。",
+    "confused": "V 不是缓存的文字答案；K 决定匹配，V 提供汇总内容。",
+    "lesson": "attention",
+    "path": "read/attention/",
+    "anchor": "qkv",
+    "aliases": [
+      "V"
+    ]
+  },
+  {
+    "id": "dot-product",
+    "name": "点积",
+    "full": "Dot Product",
+    "definition": "两个等长向量对应分量相乘，再把乘积相加，得到一个数。",
+    "example": "[0,1] 与 [1,0] 点积为 0；与 [0,1] 点积为 1。",
+    "confused": "点积只得到匹配得分；不是加权后的输出向量。",
+    "lesson": "attention",
+    "path": "read/attention/",
+    "anchor": "scores",
+    "aliases": []
+  },
+  {
+    "id": "softmax",
+    "name": "Softmax",
+    "full": "Softmax，归一化指数函数",
+    "definition": "把一组分数转换为非负且总和为 1 的权重，高分得到较大权重。",
+    "example": "把 [0,0.7071] 转成约 [0.3302,0.6698]。",
+    "confused": "它不会把所有分数直接除以总和；Attention 的位置权重也不是下一 token 的概率。",
+    "lesson": "attention",
+    "path": "read/attention/",
+    "anchor": "softmax",
+    "aliases": []
+  },
+  {
+    "id": "causal-mask",
+    "name": "因果遮罩",
+    "full": "Causal Mask",
+    "definition": "让一个位置只能读取自身与此前位置，禁止读取后续位置的规则。",
+    "example": "位置 2 可以读取 0、1、2，不能读取位置 3。",
+    "confused": "不是把未来 token 从存储中删除；它限制本轮 Attention 中哪些位置能贡献。",
+    "lesson": "attention",
+    "path": "read/attention/",
+    "anchor": "mask",
+    "aliases": [
+      "mask",
+      "因果掩码"
+    ]
+  },
+  {
+    "id": "loss",
+    "name": "损失",
+    "full": "Loss",
+    "definition": "将模型当前输出与训练目标比较，得到要优化的数值。",
+    "example": "目标是 6，预测为 4，平方误差为 (4−6)²=4。",
+    "confused": "训练损失更小不保证真实任务质量一定更好。",
+    "lesson": "gradients",
+    "path": "read/gradients/",
+    "aliases": [
+      "损失函数"
+    ]
+  },
+  {
+    "id": "gradient",
+    "name": "梯度",
+    "full": "Gradient",
+    "definition": "损失对各个可训练参数的局部变化率，告诉我们微小改动会怎样影响损失。",
+    "example": "损失对 w 的导数为 −8 时，适当增大 w 可以在局部减小损失。",
+    "confused": "梯度是局部信息，不是一次就能到达最优解的坐标。",
+    "lesson": "gradients",
+    "path": "read/gradients/",
+    "aliases": [
+      "导数"
+    ]
+  },
+  {
+    "id": "backprop",
+    "name": "反向传播",
+    "full": "Backpropagation",
+    "definition": "沿计算依赖反向应用链式法则，计算参数对损失的梯度。",
+    "example": "先求损失对预测的变化率，再乘预测对参数的变化率。",
+    "confused": "它计算梯度；真正更新参数由优化器步骤完成。",
+    "lesson": "gradients",
+    "path": "read/gradients/",
+    "aliases": []
+  },
+  {
+    "id": "optimizer",
+    "name": "优化器",
+    "full": "Optimizer",
+    "definition": "根据梯度以及所维护的状态，决定参数如何更新。",
+    "example": "SGD 用学习率乘梯度作为更新量；Adam 还维护梯度相关统计。",
+    "confused": "优化器状态不是模型输出，也不必在纯推理中加载。",
+    "lesson": "gradients",
+    "path": "read/gradients/",
+    "aliases": []
+  },
+  {
+    "id": "activation",
+    "name": "激活",
+    "full": "Activation",
+    "definition": "前向运算产生的中间张量。训练反向可能继续读取它。",
+    "example": "一个层的输出可作为下一层输入，并保留给反向求导。",
+    "confused": "激活、模型权重、梯度和优化器状态属于不同数据。",
+    "lesson": "gpu-memory",
+    "path": "read/gpu-memory/",
+    "aliases": []
+  },
+  {
+    "id": "stride",
+    "name": "步幅",
+    "full": "Stride",
+    "definition": "沿张量某一维移动一个元素时，在底层存储中跨过多少元素。",
+    "example": "连续 [2,3] 矩阵的常见步幅是 [3,1]；转置后可变为 [1,3]。",
+    "confused": "改变形状或维度顺序不一定已经复制底层数据。",
+    "lesson": "tensor-runtime",
+    "path": "read/tensor-runtime/",
+    "aliases": []
+  },
+  {
+    "id": "autograd",
+    "name": "自动求导",
+    "full": "Automatic Differentiation",
+    "definition": "按运算的求导规则组合计算图，计算目标对参数的导数。",
+    "example": "loss.backward() 沿依赖计算参数梯度。",
+    "confused": "自动求导不是有限差分，也不自动选择正确训练目标。",
+    "lesson": "tensor-runtime",
+    "path": "read/tensor-runtime/",
+    "aliases": []
+  },
+  {
+    "id": "checkpoint",
+    "name": "检查点",
+    "full": "Checkpoint",
+    "definition": "保存某个训练时刻恢复所需的模型及训练状态。",
+    "example": "权重、优化器、步数、随机状态和数据进度共同描述恢复位置。",
+    "confused": "只保存权重一般不足以等价继续训练。",
+    "lesson": "checkpoints-finetuning",
+    "path": "read/checkpoints-finetuning/",
+    "aliases": []
+  },
+  {
+    "id": "lora",
+    "name": "LoRA",
+    "full": "Low-Rank Adaptation，低秩适配",
+    "definition": "冻结原权重，通过两个较小矩阵学习增量更新的一种微调方式。",
+    "example": "把 d×d 的增量写为 d×r 与 r×d 两矩阵的乘积，r 远小于 d。",
+    "confused": "减少可训练参数不等于无需前向、反向激活或原模型权重。",
+    "lesson": "checkpoints-finetuning",
+    "path": "read/checkpoints-finetuning/",
+    "aliases": []
+  },
+  {
+    "id": "ddp",
+    "name": "DDP",
+    "full": "Distributed Data Parallel，分布式数据并行",
+    "definition": "各进程持有模型副本，用不同数据计算梯度，再同步更新依据。",
+    "example": "两卡各处理半批数据，梯度合并后各自执行同样更新。",
+    "confused": "它复制模型状态，不解决一份模型本身装不下一张卡的问题。",
+    "lesson": "ddp",
+    "path": "read/ddp/",
+    "aliases": []
+  },
+  {
+    "id": "fsdp",
+    "name": "FSDP",
+    "full": "Fully Sharded Data Parallel，完全分片数据并行",
+    "definition": "将模型状态分散到进程，计算需要时收集相应参数，之后按策略释放或重新分片。",
+    "example": "某层参数在计算前 AllGather，梯度在反向后 ReduceScatter。",
+    "confused": "分片降低常驻状态，但计算时仍有参数收集与通信峰值。",
+    "lesson": "sharding",
+    "path": "read/sharding/",
+    "aliases": [
+      "FSDP2",
+      "ZeRO"
+    ]
+  },
+  {
+    "id": "quantization",
+    "name": "量化",
+    "full": "Quantization",
+    "definition": "用有限的低精度数值及其缩放规则表示原本精度更高的数据。",
+    "example": "用步长 0.1 将 0.26 编码为整数 3，再近似还原为 0.3。",
+    "confused": "位宽更低不自动意味着端到端更快，也不保证质量不变。",
+    "lesson": "quantization",
+    "path": "read/quantization/",
+    "aliases": []
+  },
+  {
+    "id": "speculative-decoding",
+    "name": "推测解码",
+    "full": "Speculative Decoding",
+    "definition": "先用较便宜的方式提出候选 token，再由目标模型验证并决定可接受的前缀。",
+    "example": "草稿提出三个 token，目标模型可能只接受前两个。",
+    "confused": "它不等于跳过目标模型，也不等于把草稿答案直接返回。",
+    "lesson": "speculative-pd",
+    "path": "read/speculative-pd/",
+    "aliases": []
+  },
+  {
+    "id": "artifact",
+    "name": "制品",
+    "full": "Artifact",
+    "definition": "可被发布、验证和追踪版本的一组运行产物。",
+    "example": "模型权重、配置、tokenizer 和校验摘要共同组成一个模型制品。",
+    "confused": "只有一个模型名称不足以复现运行；同名内容可能发生变化。",
+    "lesson": "artifacts",
+    "path": "read/artifacts/",
+    "aliases": []
+  },
+  {
+    "id": "quota",
+    "name": "配额",
+    "full": "Resource Quota",
+    "definition": "为用户或队列限定的资源使用预算。",
+    "example": "团队被允许同时占用 8 张 GPU。",
+    "confused": "配额允许使用，不代表此刻已有 8 张合适设备空闲。",
+    "lesson": "scheduling",
+    "path": "read/scheduling/",
+    "aliases": []
+  },
+  {
+    "id": "admission",
+    "name": "任务准入",
+    "full": "Workload Admission",
+    "definition": "判断任务是否获得启动资格及相应资源预算。",
+    "example": "四卡训练要先获得四卡预算，才进入后续放置与启动。",
+    "confused": "准入不等于 Pod 已经成功启动，也不等于设备已经准备完成。",
+    "lesson": "scheduling",
+    "path": "read/scheduling/",
+    "aliases": []
+  },
+  {
+    "id": "pvc",
+    "name": "持久卷声明",
+    "full": "PersistentVolumeClaim",
+    "definition": "工作负载对持久存储容量和访问方式提出的请求。",
+    "example": "训练 Job 把检查点写到挂载的 PVC，而不是容器临时目录。",
+    "confused": "PVC 不是备份；多个 Pod 能否访问取决于访问模式和存储实现。",
+    "lesson": "kubernetes",
+    "path": "read/kubernetes/",
+    "aliases": []
+  },
+  {
+    "id": "cardinality",
+    "name": "标签基数",
+    "full": "Label Cardinality",
+    "definition": "某个指标所有标签组合可能形成的不同时间序列数量。",
+    "example": "每个请求一个 request_id，会随着请求数不断产生新的序列。",
+    "confused": "高基数不等于采样频率高；二者都会增加成本，但原因不同。",
+    "lesson": "observability",
+    "path": "read/observability/",
+    "aliases": []
+  },
+  {
+    "id": "agent",
+    "name": "智能体",
+    "full": "Agent",
+    "definition": "围绕目标调用模型与工具，并根据结果继续执行的程序。",
+    "example": "生成检索请求、读取结果，再组织回答。",
+    "confused": "它仍依赖模型、工具权限和明确的错误处理。",
+    "lesson": "cache-hierarchy",
+    "path": "read/cache-hierarchy/",
+    "aliases": []
+  },
+  {
+    "id": "metrics",
+    "name": "指标",
+    "full": "Metrics",
+    "definition": "按时间和有限维度聚合的测量数值。",
+    "example": "每分钟请求数和等待队列长度。",
+    "confused": "聚合指标通常不保存每个请求的完整过程。",
+    "lesson": "observability",
+    "path": "read/observability/",
+    "aliases": [
+      "指标",
+      "高基数",
+      "Metric"
+    ]
+  },
+  {
+    "id": "logs",
+    "name": "日志",
+    "full": "Logs",
+    "definition": "记录离散运行事件及上下文的数据。",
+    "example": "rank 1 在某节点发生通信超时的记录。",
+    "confused": "日志的出现位置不一定是故障的最早原因。",
+    "lesson": "observability",
+    "path": "read/observability/",
+    "aliases": []
+  },
+  {
+    "id": "pd",
+    "name": "Prefill/Decode 分离",
+    "full": "Prefill/Decode Disaggregation",
+    "definition": "把输入计算与逐步生成放在不同执行实例。",
+    "example": "P 实例计算前缀 KV，D 实例接收后继续生成。",
+    "confused": "分离增加 KV 传输与协调成本，不保证提速。",
+    "lesson": "speculative-pd",
+    "path": "read/speculative-pd/",
+    "aliases": []
+  },
+  {
+    "id": "prefix-cache",
+    "name": "前缀缓存",
+    "full": "Automatic Prefix Caching",
+    "definition": "在兼容计算条件下复用相同 token 前缀已经产生的 KV。",
+    "example": "两个请求共享前四个 token 的计算。",
+    "confused": "相同语义或相同后缀不等于相同前缀。",
+    "lesson": "cache-hierarchy",
+    "path": "read/cache-hierarchy/",
+    "aliases": []
+  },
+  {
+    "id": "cache-tier",
+    "name": "分层缓存",
+    "full": "Tiered Cache",
+    "definition": "在不同容量与速度的存储层之间管理可复用状态。",
+    "example": "近期 KV 留在 GPU，较冷数据转到主机内存。",
+    "confused": "加载成本可能高于重算，命中不总是值得使用。",
+    "lesson": "cache-hierarchy",
+    "path": "read/cache-hierarchy/",
+    "aliases": []
+  },
+  {
+    "id": "preflight",
+    "name": "启动前检查",
+    "full": "Preflight Check",
+    "definition": "在正式运行前验证设备、配置、网络与协作等必要条件。",
+    "example": "全组先运行小 AllReduce，再加载模型。",
+    "confused": "检查通过不证明完整模型长期运行稳定。",
+    "lesson": "lws",
+    "path": "read/lws/",
+    "aliases": []
+  },
+  {
+    "id": "resource-slice",
+    "name": "资源切片",
+    "full": "ResourceSlice",
+    "definition": "DRA 驱动发布设备库存与属性的 Kubernetes 对象。",
+    "example": "发布某个资源池中两张 GPU 的属性。",
+    "confused": "Slice 是库存表达，不是工作负载的请求。",
+    "lesson": "dra",
+    "path": "read/dra/",
+    "aliases": [
+      "资源切片",
+      "设备库存",
+      "ResourceSlice"
+    ]
+  },
+  {
+    "id": "device-class",
+    "name": "设备类别",
+    "full": "DeviceClass",
+    "definition": "DRA 中描述设备选择规则与相关配置的集群对象。",
+    "example": "指定由某驱动管理的一类 GPU。",
+    "confused": "类别不是实际分配给某请求的那张设备。",
+    "lesson": "dra",
+    "path": "read/dra/",
+    "aliases": [
+      "设备类",
+      "DeviceClass"
+    ]
+  },
+  {
+    "id": "resource-claim",
+    "name": "资源声明",
+    "full": "ResourceClaim",
+    "definition": "描述工作负载的设备请求并记录分配结果的命名空间对象。",
+    "example": "请求一张符合类别规则的 GPU。",
+    "confused": "分配结果存在不代表节点准备已经完成。",
+    "lesson": "dra",
+    "path": "read/dra/",
+    "aliases": [
+      "资源声明",
+      "DeviceClass",
+      "ResourceSlice",
+      "ResourceClaim"
     ]
   }
 ]

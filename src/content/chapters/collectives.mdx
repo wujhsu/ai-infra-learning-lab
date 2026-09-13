@@ -1,0 +1,82 @@
+---
+title: "多张卡怎样得到一致的结果？"
+description: "用两份小数组理解集合通信，再把它接到梯度同步和模型并行的数据需求。"
+order: 16
+stage: 5
+minutes: 8
+revision: 2
+status: "preview"
+terms: ["rank", "allgather", "reducescatter"]
+sources: ["nccl-api", "ddp"]
+sessions: []
+prerequisites: ["gradients", "gpu-execution"]
+question: "两个 rank 分别处理 1 条与 3 条样本，各自先求平均梯度，再把两者平均，等同于对 4 条样本求平均吗？"
+answer: "一般不等同。两个局部平均应按样本或有效 token 数加权；直接各占一半会让单样本 rank 权重过大。必须与损失定义一致。"
+bridge: "下一步：数据从一张 GPU 到另一张要经过哪里？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "distributed-training"
+introduces: ["rank", "nccl", "allreduce", "rdma", "nvlink", "nic", "allgather", "reducescatter"]
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+单卡模型已经能计算和训练。如果让多张 GPU 协作，首要问题是：每个进程各自持有哪些数据，结束后又希望得到什么？先把这个问题说清楚，通信 API 才有意义。
+
+## 通信组与 rank
+
+一个分布式程序通常有多个进程。<Term id="rank"/> 标识进程在某个通信组中的身份，world size 是组内进程数量。local rank 常表示本机上的进程编号，用于选择本机设备。
+
+两台机器各两张卡，可能有全局 rank 0–3，但每台机器本地编号都从 0 开始。把全局 rank 直接当作本地 GPU 索引，第二台机器就可能访问不存在的设备。
+
+一个进程一张 GPU 是常见安排，不是词义本身。阅读代码时先确认进程、设备与通信组映射，再理解张量属于谁。
+
+## AllReduce：每个人最终得到同一个归约结果
+
+假设 rank 0 持有 `[1,2]`，rank 1 持有 `[3,4]`。AllReduce 做求和时，对应位置相加，最后两者都得到 `[4,6]`。
+
+归约指用求和、最大值等规则合并对应元素；All 表示结果覆盖组内各参与者。它不是拼接两个数组，也不是默认求平均。需要平均时，通常还要按语义除以参与数或其他权重。
+
+```text
+开始：rank 0 [1,2]     rank 1 [3,4]
+           \             /
+             对应元素求和
+           /             \
+结束：rank 0 [4,6]     rank 1 [4,6]
+```
+
+训练里，各进程在不同数据上得到局部梯度，之后需要合并成一致的更新依据。AllReduce 可以承担合并步骤；正确的平均还依赖各进程样本数和损失归一化方式。
+
+## AllGather 与 ReduceScatter：收齐，或各拿一部分
+
+<Term id="allgather"/> 把各进程的数据片段收集起来。如果 rank 0 持有 A，rank 1 持有 B，结束后每人都有按约定顺序排列的 A 和 B。它不对 A、B 求和。
+
+<Term id="reducescatter"/> 则先按规则归约，再让各进程保留结果的不同片段。假设两份四元素梯度需要求和，结果为 `[10,20,30,40]`，rank 0 最终只保留 `[10,20]`，rank 1 只保留 `[30,40]`。
+
+这正适合状态分片：每人只负责更新一部分参数，就不必永远持有完整梯度。以后 FSDP 会用这些操作串起参数收集、计算、梯度分散。
+
+## Broadcast、AllToAll 与 Barrier 各解决什么？
+
+Broadcast 将某个源进程的数据分发给组内其他进程，适合广播初始化状态等。AllToAll 让每个进程向不同目标发送各自对应的片段，专家并行中的 token 路由会出现这种需求。
+
+Barrier 是同步点：参与者按规则到达后才能继续。它不是把所有模型状态自动变得一致，也不能代替需要的数值通信或任意设备内存同步。
+
+先写出通信前后每个 rank 的数组，再决定用哪个操作。若描述不清数组，直接猜 collective 名称很容易弄错。
+
+## 为什么调用顺序必须一致？
+
+通信操作是多个参与者共同履行的约定。如果一个 rank 进入 AllReduce，另一个因为条件分支跳过或进入不同顺序的操作，就可能一直等待或失败。
+
+形状、类型、组与顺序都需要相容。一个 rank 提前遇到数据错误退出，其他 rank 的通信超时可能只是后续症状；排障要回看所有进程的最早异常。
+
+项目提供两进程实验。CUDA/NCCL 路径需要可用 GPU；CPU/Gloo 路径可帮助验证数组语义，但不能代表 GPU 网络性能。
+
+## 算法成本为何随消息大小变化？
+
+通信时间可以粗略分为每次操作的固定启动成本与随字节量增加的传输成本。小消息可能被启动和同步限制，大消息更容易体现带宽限制。
+
+把许多小梯度合成 bucket 可以减少调用开销，但也可能更晚才能开始通信。下一章先看数据必须经过哪些硬件路径，再研究什么时候值得重叠。

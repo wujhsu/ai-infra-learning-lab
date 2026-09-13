@@ -1,0 +1,8 @@
+flowchart TB
+ J[训练 Job：完整资源需求] --> L[LocalQueue：提交入口]
+ L --> C[ClusterQueue：预算与策略]
+ C --> A[Workload 获得准入]
+ A --> S[调度器：节点放置]
+ S --> D[设备分配与节点准备]
+ D --> T[首次有效训练 step]
+ T --> R[完成或恢复后释放预算]

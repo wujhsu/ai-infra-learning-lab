@@ -1,0 +1,82 @@
+---
+title: "一个算子怎样减少数据搬运？"
+description: "从逐元素表达式开始，理解融合与分块减少了什么工作，再用 Triton 实现边界正确的 kernel。"
+order: 14
+stage: 4
+minutes: 8
+revision: 2
+status: "preview"
+terms: []
+sources: ["triton", "cuda", "attention"]
+sessions: []
+prerequisites: ["profiling", "gpu-execution"]
+question: "融合后 kernel 数量更少，为什么端到端仍可能没有加速？"
+answer: "原来这部分占比可能很小；融合可能增加寄存器或改变有效并行；编译与调度开销也可能抵消收益。需要确认真实基线已做哪些优化，并比较相同工作负载的端到端时间。"
+bridge: "下一步：编译器到底改变了哪些工作？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "single-training"
+introduces: []
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+我们先优化一个足够小、结果容易核对的表达式：`relu(2*x+1)`。relu 把负数变为零，非负数保持不变。它是数值加工，不涉及模型结构中的所有复杂性。
+
+## 三个操作可能意味着三次数据往返
+
+朴素执行可以先生成 `2*x`，再生成 `2*x+1`，最后执行 relu。中间数组可能被写回设备内存，再由下一项读取；还可能有多次 kernel 启动。
+
+融合把这些步骤放进一次设备程序。每个位置读入 x，在线程局部完成乘、加、截断，最后只写最终结果。算术结果相同，但中间数据搬运与启动数量可能减少。
+
+对大数组，减少设备内存流量可能更重要；对小数组，启动开销可能更明显。框架也可能已经融合其中一些操作，所以先看真实执行，不能假设每个 Python 运算一定单独启动一个 kernel。
+
+## 一个 Triton 程序处理一块元素
+
+Triton 让我们用块级数组操作描述 GPU 工作。下面的核心片段演示索引、边界 mask 和融合：
+
+```python
+@triton.jit
+def fused(X, Y, N: tl.constexpr, BLOCK: tl.constexpr):
+    offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    active = offsets < N
+    values = tl.load(X + offsets, mask=active, other=0.0)
+    result = tl.maximum(values * 2.0 + 1.0, 0.0)
+    tl.store(Y + offsets, result, mask=active)
+```
+
+每个 program 实例处理一个块。`program_id(0)` 决定块的位置；块内相对位置加上块起点，得到全局索引。最后一个块可能超出数组长度，mask 保证无效位置不读写。
+
+完整可运行包装与基准在 `labs/kernel/triton_fused.py`。安装项目二的 kernel 依赖后，运行 `python labs/kernel/triton_fused.py`。它检查非整除长度、与 PyTorch 基线的误差，再测多个规模。只有核心函数还不够完成一个实验：还需要分配输出、选择启动网格、预热、计时和检查错误。
+
+## 融合也有代价
+
+更多操作放进一个 kernel，可能增加寄存器需求、让不同阶段无法分别选择最合适的实现，或引入难以处理的依赖。复杂操作之间也不一定能直接融合。
+
+所以优化问题不是“能不能把所有代码合成一个 kernel”，而是“当前瓶颈里的哪些中间量值得避免写回，代价是什么”。
+
+## 从向量表达式走到矩阵分块
+
+矩阵乘法的每个输出是输入一行与另一矩阵一列的点积。相邻输出会重复使用很多输入。如果每个输出都独立从设备内存读取，重复搬运会非常多。
+
+分块策略一次计算输出的一小片，把对应输入子块加载后复用。沿归约维度分多轮累加，最后写出输出块。它仍在算同一个矩阵乘法，只是改变了数据读取顺序和复用位置。
+
+块越大，可能复用更多数据，但也需要更多寄存器或共享存储，并影响可同时执行的块数。块大小应随硬件、数据类型和输入形状选择，不能把一个示例配置当作永远最优。
+
+## FlashAttention 的主线思想放在哪里理解？
+
+普通注意力容易产生很大的位置对位置得分矩阵。高效注意力实现通过分块与在线归一化等方法，减少将完整中间矩阵写回较远存储的需要。
+
+它没有取消 Q/K/V 的依赖，也不是把注意力随意换成近似答案。具体算法的正确性、数值行为与硬件适配要看相应版本；这里先把它放进“避免中间物化、增加复用”的优化地图。
+
+训练中的反向还会带来不同的重计算与存储取舍，因此不能只看前向的一张性能图就推断完整训练收益。
+
+## 给自己一个有边界的实现任务
+
+先完成长度为 1000 的向量表达式，确保最后一个不满块的部分也正确。再增加大数组测试，观察优势是否变化。然后修改块大小，记录结果与硬件。
+
+当结果变慢时，回到启动次数、内存流量和资源占用，而不是直接归因于“编译器不好”。下一章把手工优化与框架编译联系起来。

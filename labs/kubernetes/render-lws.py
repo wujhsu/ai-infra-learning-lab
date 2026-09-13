@@ -16,7 +16,7 @@ test -n "$LWS_WORKER_INDEX"
 nvidia-smi
 torchrun --nnodes="$LWS_GROUP_SIZE" --nproc-per-node=1 --node-rank="$LWS_WORKER_INDEX" --master-addr="$LWS_LEADER_ADDRESS" --master-port=29501 /lab/allreduce.py
 touch /tmp/preflight-passed
-exec vllm serve Qwen/Qwen2.5-0.5B-Instruct --revision "$MODEL_REVISION" --served-model-name lab-model --host 0.0.0.0 --port 8000 --max-model-len 2048 --gpu-memory-utilization 0.8 --tensor-parallel-size 1 --pipeline-parallel-size 2 --distributed-executor-backend mp --data-parallel-backend mp --nnodes "$LWS_GROUP_SIZE" --node-rank "$LWS_WORKER_INDEX" --master-addr "$LWS_LEADER_ADDRESS" --master-port 29500'''
+exec vllm serve Qwen/Qwen3-0.6B --revision "$MODEL_REVISION" --served-model-name lab-model --host 0.0.0.0 --port 8000 --max-model-len 2048 --gpu-memory-utilization 0.8 --tensor-parallel-size 1 --pipeline-parallel-size 2 --distributed-executor-backend mp --data-parallel-backend mp --nnodes "$LWS_GROUP_SIZE" --node-rank "$LWS_WORKER_INDEX" --master-addr "$LWS_LEADER_ADDRESS" --master-port 29500'''
 def template(leader):
  container={'name':'engine','image':a.image,'command':['bash','-c',common+('' if leader else ' --headless')],
   'env':[{'name':'MODEL_REVISION','value':a.model_revision},{'name':'NCCL_DEBUG','value':'INFO'}],

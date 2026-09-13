@@ -1,5 +1,5 @@
 ---
-import {getCollection} from 'astro:content';import Base from '../layouts/Base.astro';import Notebook from '../components/Notebook';
-const all=await Promise.all((['lessons','topics','labs'] as const).map(async(kind)=>(await getCollection(kind)).map(e=>[`${kind==='lessons'?'learn':kind}/${e.id}`,e.data.title])));const titles=Object.fromEntries(all.flat());
+import {getCollection} from 'astro:content';import Base from '../layouts/Base.astro';import Notebook from '../components/Notebook';import glossary from '../data/glossary.json';
+const all=await Promise.all((['chapters','projects','code','advanced'] as const).map(async(kind)=>(await getCollection(kind)).map(e=>[`${kind==='chapters'?'read':kind}/${e.id}`,e.data.title])));const titles=Object.fromEntries([...all.flat(),...glossary.map(t=>[`terms/${t.id}`,t.name])]);
 ---
 <Base title="我的学习记录"><div class="page-wrap"><header class="page-title"><span class="eyebrow">我的理解 · 我的证据</span><h1>把读过的，变成自己的</h1></header><Notebook base={import.meta.env.BASE_URL} titles={titles} client:load/><noscript>学习记录需要 JavaScript 和浏览器本地存储。正文阅读不受影响。</noscript></div></Base>

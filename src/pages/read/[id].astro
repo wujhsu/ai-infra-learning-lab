@@ -1,0 +1,7 @@
+---
+import {getCollection,render} from 'astro:content';
+import Reader from '../../layouts/Reader.astro';
+export async function getStaticPaths(){return(await getCollection('chapters')).map(entry=>({params:{id:entry.id},props:{entry}}));}
+const {entry}=Astro.props;const {Content,headings}=await render(entry);
+---
+<Reader entry={entry} headings={headings}><Content/></Reader>

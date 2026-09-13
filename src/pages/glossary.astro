@@ -1,4 +1,4 @@
 ---
 import Base from '../layouts/Base.astro';import glossary from '../data/glossary.json';import {asset} from '../data/curriculum';
 ---
-<Base title="术语索引"><div class="page-wrap"><header class="page-title"><span class="eyebrow">不用一次记住</span><h1>在需要的时候，理解一个词</h1><p>从准确含义、具体例子和容易混淆的边界入手。正文中也可以就地展开这些解释。</p></header><div class="glossary-list" data-pagefind-body>{glossary.map(t=><section class="glossary-entry" id={t.id}><h2>{t.name}</h2><small>{t.full} · {t.aliases.join(' / ')}</small><p>{t.definition}</p><p><b>例子：</b>{t.example}</p><p><b>容易混淆：</b>{t.confused}</p><a href={asset(`learn/${t.lesson}/`)}>在课程里理解 →</a></section>)}</div></div></Base>
+<Base title="术语索引"><div class="page-wrap"><header class="page-title"><span class="eyebrow">不用一次记住</span><h1>在需要的时候，理解一个词</h1><p>从准确含义、具体例子和容易混淆的边界入手。正文中也可以就地展开这些解释。</p></header><div class="glossary-list" data-pagefind-body>{glossary.map(t=><section class="glossary-entry" id={t.id}><h2>{t.name}</h2><small>{t.full} · {t.aliases.join(' / ')}</small><p>{t.definition}</p><p><b>例子：</b>{t.example}</p><p><b>容易混淆：</b>{t.confused}</p><a href={asset(t.path+(t.anchor?`#${t.anchor}`:''))}>在课程里理解 →</a></section>)}</div></div></Base>

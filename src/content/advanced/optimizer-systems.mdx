@@ -1,0 +1,49 @@
+---
+title: "优化器：更新规则也有系统成本"
+description: "在主线机制之上研究适用条件、实现选择与可验证的问题。"
+order: 5
+stage: 1
+minutes: 25
+revision: 2
+status: "preview"
+terms: []
+sources: ["optim", "pytorch"]
+sessions: ["speedy-optimizers"]
+prerequisites: ["training-memory", "profiling"]
+question: "融合优化器每步更快，能否仅凭这一点证明训练总成本更低？"
+answer: "不能。需看它占总 step 的比例、收敛工作量、数值行为和达到同一质量的总时间。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "机制研究与资料核验；专题硬件实验未运行；待真实试读"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+梯度章用 SGD 解释参数怎样改变，训练内存章记录了优化器状态。现在把数学规则与内存读写连起来，研究为什么优化器阶段也可能成为瓶颈。
+
+## 从动量理解额外状态
+
+普通 SGD 使用当前梯度；动量维护历史方向，例如 v_new=βv+g，再按 v_new 更新参数。每个可训练参数多一份状态，就增加相应存储与读写。
+
+Adam 类优化器维护梯度的一阶与二阶统计，还包含偏差修正与分母稳定项。状态精度、权重精度与更新实现可以不同，所以不能只按参数文件大小推算训练峰值。
+
+## 小更新为什么会被启动成本淹没
+
+模型有很多小参数张量时，逐张量执行多个操作可能产生大量 kernel 启动和中间读写。foreach、融合或编译路径试图组织更多工作，但收益依赖张量规模、设备和实现。数值顺序改变也需要对照。
+
+比较时先固定相同初始参数、梯度、超参数与步数，检查更新结果；再测稳态优化器时间，并把总训练 step 一起记录。优化器阶段快两倍，如果原来只占 2%，总收益仍有限。
+
+## 训练目标不能被性能比较偷换
+
+改变学习率、动量或权重衰减会改变优化轨迹。某个方法每步更快，但需要更多步达到同一验证目标，未必降低总成本。新优化器应同时报告数值规则、任务质量、达到目标的工作量与系统消耗。
+
+大会 Speedy Optimizers 的案例适合提示你关注这一层，但其结果不替代本模型的收敛与性能实验。[PyTorch 优化器参考](https://docs.pytorch.org/docs/stable/optim.html)
+
+## 实验任务
+
+本库 `labs/kernel/optimizers.py` 提供优化器比较入口；先阅读其设备、输入与计时范围，再在独立环境运行。扩展时增加保存加载后的下一步对照，确认优化器状态不是可随意丢弃的缓存。
+
+给出一份分解账本：状态字节、每步时间、总 step 时间与验证损失。若没有 GPU，只完成更新规则与状态恢复检查，不给出设备性能排名。

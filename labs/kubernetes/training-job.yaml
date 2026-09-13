@@ -1,0 +1,31 @@
+# Template: replace image; choose a compatible default StorageClass or set storageClassName.
+apiVersion: v1
+kind: Namespace
+metadata: {name: training-lab}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: training-results, namespace: training-lab}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {name: tiny-training, namespace: training-lab}
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: YOUR_REGISTRY/ai-infra-tiny:VERSION
+          resources:
+            requests: {cpu: "1", memory: 1Gi}
+            limits: {cpu: "2", memory: 2Gi}
+          volumeMounts: [{name: results, mountPath: /results}]
+      volumes:
+        - name: results
+          persistentVolumeClaim: {claimName: training-results}

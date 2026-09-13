@@ -1,0 +1,110 @@
+[
+  {
+    "id": "stage-1",
+    "title": "模型怎样计算与学习",
+    "outcome": "实现、训练并重新加载一个极小模型",
+    "chapters": [
+      "generation",
+      "representations",
+      "attention",
+      "kv-reuse",
+      "gradients",
+      "tiny-training"
+    ]
+  },
+  {
+    "id": "stage-2",
+    "title": "计算怎样落到硬件与框架",
+    "outcome": "跟踪一次执行的时间与内存",
+    "chapters": [
+      "gpu-memory",
+      "tensor-runtime",
+      "gpu-execution"
+    ]
+  },
+  {
+    "id": "stage-3",
+    "title": "单机训练工程",
+    "outcome": "让数据、显存与恢复形成可靠训练流程",
+    "chapters": [
+      "data-pipeline",
+      "training-memory",
+      "checkpoints-finetuning"
+    ]
+  },
+  {
+    "id": "stage-4",
+    "title": "算子与编译优化",
+    "outcome": "验证正确性后，再解释优化收益",
+    "chapters": [
+      "profiling",
+      "kernel-lab",
+      "compilation"
+    ]
+  },
+  {
+    "id": "stage-5",
+    "title": "多设备通信基础",
+    "outcome": "理解每个进程持有什么、在等待什么",
+    "chapters": [
+      "collectives",
+      "topology",
+      "nccl"
+    ]
+  },
+  {
+    "id": "stage-6",
+    "title": "分布式训练",
+    "outcome": "解释扩展效率，并从故障恢复",
+    "chapters": [
+      "ddp",
+      "sharding",
+      "model-parallel",
+      "recovery"
+    ]
+  },
+  {
+    "id": "stage-7",
+    "title": "推理引擎与服务",
+    "outcome": "部署、测量并理解一个完整服务",
+    "chapters": [
+      "serving",
+      "kv-allocation",
+      "scheduler"
+    ]
+  },
+  {
+    "id": "stage-8",
+    "title": "推理优化与复杂负载",
+    "outcome": "同时验证速度、质量与资源代价",
+    "chapters": [
+      "cache-hierarchy",
+      "quantization",
+      "speculative-pd"
+    ]
+  },
+  {
+    "id": "stage-9",
+    "title": "AI 平台与资源管理",
+    "outcome": "把训练任务和推理服务纳入同一资源体系",
+    "chapters": [
+      "artifacts",
+      "kubernetes",
+      "scheduling",
+      "dra",
+      "lws"
+    ]
+  },
+  {
+    "id": "stage-10",
+    "title": "生产运行与工程判断",
+    "outcome": "交付可观测、可恢复且可评估的系统",
+    "chapters": [
+      "observability",
+      "diagnostics",
+      "delivery",
+      "economics",
+      "workloads"
+    ]
+  }
+]

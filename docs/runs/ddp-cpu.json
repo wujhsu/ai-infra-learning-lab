@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-13",
+  "python": "3.12.14",
+  "torch": "2.14.0",
+  "backend": "gloo",
+  "world_size": 2,
+  "device": "cpu",
+  "max_parameter_error": 1.4901161193847656e-08,
+  "matches_global_batch": true,
+  "command": "torchrun --standalone --nproc-per-node=2 labs/distributed/ddp_check.py",
+  "scope": "equal local batch sizes; one SGD update; not a GPU performance result"
+}

@@ -1,0 +1,7 @@
+flowchart TB
+ CPU[CPU：准备输入与提交计算] -->|主机到设备搬运| HBM[显存：权重 / 激活 / KV]
+ HBM -->|读取数据| SM[GPU 执行单元]
+ SM --> SH[片上共享内存与寄存器]
+ SH --> SM
+ SM -->|写回结果| HBM
+ HBM -->|必要结果回传| CPU

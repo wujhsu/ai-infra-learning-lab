@@ -1,0 +1,82 @@
+---
+title: "训练与推理在集群里怎样运行？"
+description: "从一个训练进程和一个常驻服务开始，理解 Kubernetes 对象、持久数据与就绪状态。"
+order: 30
+stage: 9
+minutes: 8
+revision: 2
+status: "preview"
+terms: ["pod", "pvc"]
+sources: ["k8s", "device-plugin"]
+sessions: []
+prerequisites: ["artifacts"]
+question: "为什么给训练 Job 配置自动重试，仍不能称为训练恢复？"
+answer: "重试只重建执行；若程序没有加载一致检查点、优化器和数据进度，它会重新开始或产生不同轨迹。"
+bridge: "下一步：任务为什么有卡也不能立刻启动？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "platform"
+introduces: ["pod", "controller", "container", "image", "node", "deployment", "service", "pvc"]
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+你已经熟悉后端服务部署，所以这里不重新解释 HTTP。我们只解决集群增加的问题：进程应该在哪台机器运行，失败后谁重建它，模型和检查点放在哪里，以及什么时候开始接收流量。
+
+## 先区分“完成一件事”和“持续提供服务”
+
+训练通常有终点：达到指定步数，写出检查点并退出。Kubernetes 的 Job 用来表达这类完成型工作负载。推理服务持续监听请求，通常由 Deployment 保持期望副本数。多机模型组还需要后面介绍的 LWS 等更明确的组管理方式。
+
+<Term id="pod" context="这里一个 Pod 是被调度到同一节点的一组容器及其共享运行上下文；不是一张 GPU，也不是整个分布式训练任务。" /> 是调度和运行的基础对象。容器退出、Pod 被重建、节点失联，是不同层次的事件。重建一个训练 Pod 不会自动把程序恢复到上次 step；应用必须实现检查点加载。
+
+<Diagram id="reconcile" caption="声明期望状态后，控制器、调度器与节点组件分别负责重建、放置和启动。" />
+
+## 声明资源是在约定什么
+
+CPU 与内存 requests 参与调度资源核算；limits 约束运行时使用。GPU 的传统扩展资源通常以设备数量请求，例如 `nvidia.com/gpu: 1`。设备插件报告可用设备并参与容器设备注入，具体共享行为取决于设备插件和驱动配置。[设备插件机制](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/)
+
+一张 GPU 申请成功，不代表该 GPU 有足够显存加载任意模型，也不意味着应用会自动选择正确精度。调度层、设备层与模型显存账本需要共同成立。
+
+```yaml
+# 部署片段：只表达一个容器的资源；完整清单见平台项目。
+resources:
+  requests:
+    cpu: "2"
+    memory: 8Gi
+  limits:
+    cpu: "4"
+    memory: 16Gi
+    nvidia.com/gpu: 1
+```
+
+CPU 配得过少可能让 tokenizer 与数据准备跟不上 GPU；内存不足可能在权重加载时被终止。这两种问题都不能靠 GPU 利用率一个数诊断。
+
+## 模型与检查点怎样跨过 Pod 的寿命
+
+容器文件系统与临时卷适合可丢弃缓存。需要跨重建保留的数据，应写到持久存储或外部对象存储。<Term id="pvc" /> 将所需存储与具体底层实现解耦，但访问模式、拓扑、容量和性能仍需检查。
+
+单节点能写的卷不等于多个训练 rank 都能在不同节点同时挂载。共享检查点路径也不等于自动具备一致性提交。先在两个目标节点读写一个小文件，验证挂载和权限，再进行多 GiB 的检查点测试。
+
+## 三种探针不能混用
+
+startupProbe 给较慢的首次初始化留出窗口；readinessProbe 表示当前是否适合接流量；livenessProbe 用于发现需要重启的失活状态。模型正在下载时不 ready 是合理状态，不一定应该被 liveness 反复杀掉。
+
+只检测端口打开也可能过早。进程监听不代表模型权重、跨 rank 通信和必要预热已完成。与此同时，过重的健康检查又可能消耗推理资源。选择可解释的轻量检查，再用部署后的真实小请求作为业务检查点。
+
+## 按事件顺序排查一次 Pending
+
+先看 Pod 事件：若显示资源不足，进程尚未启动，应查设备数量、亲和约束、配额与节点状态。若停在挂载或镜像拉取，检查存储和镜像访问。若容器启动后报错，才进入应用日志。把这三阶段分开，能避免对尚未获得设备的 Pod 调整模型参数。
+
+```bash
+kubectl -n inference-lab get pods -o wide
+kubectl -n inference-lab describe pod POD_NAME
+kubectl -n inference-lab logs POD_NAME --all-containers
+```
+
+`POD_NAME` 要替换为第一条命令返回的真实名字。若发生重启，还要读取前一容器实例日志并保存时间与节点身份。
+
+当多团队同时提交训练任务，仅仅让所有 Pod 竞争节点还不够。下一章先在任务层决定谁获得启动预算，再讨论具体放置。

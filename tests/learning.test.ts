@@ -42,20 +42,27 @@ test('DRA filters health, memory and topology independently',()=>{
  assert.deepEqual(selectDevices(100,false),[]);
 });
 test('import rejects future schemas, malformed progress, and unsafe IDs',()=>{
- assert.throws(()=>validateStore({version:2,records:{}}));
- assert.throws(()=>validateStore({version:1,records:{'../x':emptyEntry()}}));
- const s=emptyStore();s.records['learn/01-request']={...emptyEntry(),note:'<script>text only</script>'};
- assert.equal(validateStore(s).records['learn/01-request'].note,'<script>text only</script>');
- assert.throws(()=>validateStore({...s,records:{'learn/01-request':{...emptyEntry(),read:'true'}}}));
+ assert.throws(()=>validateStore({version:99,records:{}}));
+ assert.throws(()=>validateStore({version:2,records:{'../x':emptyEntry()}}));
+ const s=emptyStore();s.records['read/generation']={...emptyEntry(),note:'<script>text only</script>'};
+ assert.equal(validateStore(s).records['read/generation'].note,'<script>text only</script>');
+ assert.throws(()=>validateStore({...s,records:{'read/generation':{...emptyEntry(),read:'true'}}}));
 });
 test('each import conflict mode preserves the expected note and unrelated records',()=>{
  const a=emptyStore(),b=emptyStore();
- a.records['learn/01-request']={...emptyEntry(),note:'local',updated:'2026-09-12T00:00:00Z'};
- b.records['learn/01-request']={...emptyEntry(),note:'import',updated:'2026-09-13T00:00:00Z'};
- b.records['learn/02-kubernetes']=emptyEntry();
- assert.equal(mergeStores(a,b,'newer').records['learn/01-request'].note,'import');
- assert.equal(mergeStores(a,b,'keep').records['learn/01-request'].note,'local');
- assert.equal(mergeStores(b,a,'replace').records['learn/01-request'].note,'local');
+ a.records['read/generation']={...emptyEntry(),note:'local',updated:'2026-09-12T00:00:00Z'};
+ b.records['read/generation']={...emptyEntry(),note:'import',updated:'2026-09-13T00:00:00Z'};
+ b.records['read/representations']=emptyEntry();
+ assert.equal(mergeStores(a,b,'newer').records['read/generation'].note,'import');
+ assert.equal(mergeStores(a,b,'keep').records['read/generation'].note,'local');
+ assert.equal(mergeStores(b,a,'replace').records['read/generation'].note,'local');
  assert.equal(Object.keys(mergeStores(a,b,'keep').records).length,2);
- assert.equal(a.records['learn/01-request'].note,'local');
+ assert.equal(a.records['read/generation'].note,'local');
+});
+
+test('old curriculum progress is never imported into this library',()=>{
+ assert.throws(()=>validateStore({version:1,records:{}}));
+ assert.throws(()=>validateStore({version:2,records:{'learn/old':emptyEntry()}}));
+ const s=emptyStore();s.records['terms/token']={...emptyEntry(),review:true};
+ assert.equal(validateStore(s).records['terms/token'].review,true);
 });

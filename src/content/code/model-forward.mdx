@@ -1,0 +1,63 @@
+---
+title: "参数怎样进入前向与梯度？"
+description: "从自己的两层模型追到 PyTorch Linear，用形状和梯度观察点连接抽象与实现。"
+order: 1
+stage: 1
+minutes: 24
+revision: 2
+status: "preview"
+terms: []
+sources: ["torch-source", "autograd"]
+sessions: []
+prerequisites: ["gradients", "tensor-runtime"]
+question: "Linear 的输出维度改变时，weight.grad 的形状为什么也改变？"
+answer: "梯度逐项对应权重；输出维度改变了权重矩阵的行数，所以其梯度也随之改变。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "固定 tag 的入口源码已读取；硬件调用路径待设备上观察"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+这次只回答一个问题：一个可训练权重什么时候成为计算输入，又怎样得到梯度？先读完表示、梯度和张量运行时章节，再打开源码。不要试图一次读完 PyTorch。
+
+## 先在小模型中画路径
+
+本库 `labs/tiny_model/model.py` 的路径是 ID → token/位置 Embedding → Block → QKV 投影 → Attention → 输出投影 → MLP → 候选得分。训练代码将得分与右移标签传给交叉熵，再调用 backward。
+
+在每个投影前后标注 `[B,T,C]`。若 QKV 一起投影，最后维度先成为 `3C`，再拆成三份。拆 head 是改变组织方式；线性投影才引入新的乘加与权重。
+
+## 打开真实 Linear 入口
+
+阅读 [PyTorch v2.14.0 的 Linear.forward](https://github.com/pytorch/pytorch/blob/v2.14.0/torch/nn/modules/linear.py#L130)。它把输入、weight 和 bias 交给 functional linear。继续向上检查初始化中的权重形状：`[out_features,in_features]`。
+
+对输入 `[B,T,C]`，输出为 `[B,T,D]`，数学关系可写成输入乘权重转置并加偏置。不要因为底层权重存储是 `[D,C]`，就把正文中的矩阵乘法方向倒过来。
+
+这个 Python 文件不是最终 GPU kernel。继续追到底层需要区分算子分发、自动求导包装和后端实现；本任务先到“参数成为算子输入”的边界，不把一次 Python 跳转称为已经读懂 kernel。
+
+## 用程序观察生命周期
+
+```python
+import torch
+layer = torch.nn.Linear(2, 3)
+x = torch.tensor([[1., 2.]], requires_grad=True)
+y = layer(x)
+print(x.shape, layer.weight.shape, y.shape)
+print(layer.weight.grad)  # backward 前通常为 None
+loss = y.square().mean()
+loss.backward()
+print(layer.weight.grad.shape, x.grad.shape)
+```
+
+预期形状依次是 `[1,2]`、`[3,2]`、`[1,3]`；反向后参数梯度与参数同形，输入梯度与输入同形。数值由随机权重决定，不应照抄一组固定输出。
+
+再执行 `optimizer.step()`，比较权重前后；仅调用 backward 不会替你更新参数。再次 backward 前清空梯度，或者明确是在做累积。把每个动作与梯度章的标量例子对应起来。
+
+## 阅读任务与边界
+
+把 bias 关闭，预测少了什么参数及加法；把输出维度改为 4，预测所有形状；在 `torch.no_grad()` 中执行前向，观察输出是否保留反向关系。最后解释 `model.eval()` 为什么不能代替 no_grad。
+
+你的交付是一张标注形状的数据流图和一份观察日志，而不是仓库文件清单。能够从某个梯度的名字回到它参与的投影，才完成本次阅读。

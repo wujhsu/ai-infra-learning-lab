@@ -1,0 +1,51 @@
+---
+title: "梯度什么时候开始跨 rank 同步？"
+description: "从 DDP forward 的前后处理进入 reducer，寻找反向就绪与通信之间的连接。"
+order: 2
+stage: 1
+minutes: 24
+revision: 2
+status: "preview"
+terms: []
+sources: ["torch-source", "ddp", "nccl"]
+sessions: []
+prerequisites: ["ddp", "nccl"]
+question: "为什么不在每个 optimizer.step 之后再平均参数，直接代替 DDP？"
+answer: "那是不同算法路径，尤其有动量或 Adam 状态时不等价。DDP 通常同步梯度后由各 rank 执行一致更新。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "固定 tag 的入口源码已读取；硬件调用路径待设备上观察"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+先完成双进程参数对照实验。你已知道 DDP 让各 rank 的更新对应全局批次；现在寻找同步是如何嵌入执行过程的。
+
+## 入口不是 optimizer.step
+
+从 [v2.14.0 distributed.py 的 forward](https://github.com/pytorch/pytorch/blob/v2.14.0/torch/nn/parallel/distributed.py#L1885) 开始，识别 `_pre_forward`、被包装模块的 forward 与 `_post_forward`。这说明 DDP 包装了模型执行，但不能由此认为所有梯度都在 forward 内完成通信。
+
+继续读 `_post_forward`，寻找反向准备、是否需要梯度同步以及输出处理。再追 reducer 相关初始化与 autograd hook。完整实现包含 C++ reducer，Python 文件不是全部逻辑。
+
+<Diagram id="ddp" caption="反向产生梯度后，已就绪的分组可以开始通信；优化器消费的是完成同步的梯度。" />
+
+## 先认识桶这个执行单位
+
+多个参数梯度可以组成一个通信分组。桶准备好时发起通信，可能与更早层的反向计算重叠。分组过碎会增加启动成本，过大又可能让通信开始太晚。是否成功重叠，需要时间线证明。
+
+阅读源码时记下：哪个条件表示本轮需要同步，哪个对象管理参数和梯度，哪些路径处理未使用参数。不要把某个项目的默认桶大小写成算法必需的常量。
+
+## 在实验中观察一个改变
+
+在项目三的固定数据基线上，给两个微批次做梯度累积。前一个微批次把 forward 与 backward 都放在 `no_sync()` 范围内，最后一个恢复同步；按同一全局损失规则缩放。再与一次全局批次更新比较参数。
+
+若只把 backward 放进 no_sync，而 forward 在外面，不能默认实现仍符合预期。API 的上下文边界是阅读任务的一部分。[DDP 文档](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html)
+
+## 追一次不对称执行
+
+假设 rank 0 跳过了一个分支，rank 1 使用了该分支的参数。先判断哪些梯度会产生，再看 DDP 对未使用参数与静态图的配置要求。不要立刻开启一堆开关来消除报错；先解释各 rank 为什么走了不同路径。
+
+交付时画出本地损失、反向梯度、桶、collective、优化器五个节点，附固定版本入口和 profiler 观察点。CPU 对照确认语义，GPU 时间线才用于分析 NCCL 重叠。

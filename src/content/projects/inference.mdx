@@ -1,0 +1,88 @@
+---
+title: "项目四 · 推理性能实验室"
+description: "部署真实模型，测量首输出与负载变化，再验证取消、缓存和质量。"
+order: 4
+stage: 1
+minutes: 29
+revision: 2
+status: "preview"
+terms: []
+sources: ["vllm-serving", "vllm-metrics", "vllm-prefix", "quantization"]
+sessions: []
+prerequisites: ["speculative-pd"]
+question: "关闭客户端连接是否已验证 KV 释放？"
+answer: "没有。还需确认后端收到取消、停止推进并释放活动引用，且后续请求能复用容量；缓存保留与活动泄漏要区分。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "流式协议测试已运行；真实 GPU 服务、性能与取消回收待执行"
+environment: "Linux CUDA GPU + Docker；客户端为标准库 Python"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+<a href={asset('downloads/labs.zip')}>下载全部实验源码 ZIP</a>，或克隆本站仓库。下列命令从仓库根目录执行；ZIP 只包含 `labs/`，涉及 `tests/` 的自动化检查请使用仓库。实际用时取决于安装、下载和设备，本页不把阅读时间当成实验时间。
+
+## 环境与输出物
+
+需要 Linux CUDA GPU、可用 Docker GPU 运行时，以及模型下载网络。默认 Qwen3-0.6B 固定 revision、vLLM 0.29.0、上下文上限 4,096。容量要求应从设备与启动日志确认，不给未经运行的最低显存保证。
+
+本次未运行 GPU 服务。已执行的是流式解析器的模拟服务测试；它能检查协议处理，不代表真实引擎的延迟、取消或质量已经验证。
+
+## 启动前先固定身份
+
+```bash
+python3 labs/serving/prepare.py
+bash labs/serving/serve.sh
+```
+
+准备脚本生成模型版本环境文件，启动脚本记录实际拉取的镜像身份并创建 `ai-infra-lab` 网络。服务名统一为 `lab-model`。首次加载可能需要下载与编译，应把冷启动时间单独记录。
+
+另开终端检查 `/health`，再发送短请求。脚本请求关闭 Qwen3 thinking，避免把推理内容与最终正文的测量混在一起。若想研究 thinking，应单独改变该设置并重新定义输出统计。
+
+```bash
+curl -f http://127.0.0.1:8000/health
+python3 labs/serving/measure_stream.py --requests 5 --concurrency 1 --output warmup.jsonl
+```
+
+先检查是否收到非空内容、正常结束标记与 usage。只有 HTTP 200 而没有完整内容，不能算一次成功生成。
+
+## 建立最小性能矩阵
+
+```bash
+python3 labs/serving/measure_stream.py --requests 100 --concurrency 1 --output c1.jsonl
+python3 labs/serving/measure_stream.py --requests 100 --concurrency 8 --output c8.jsonl
+python3 labs/serving/measure_stream.py --requests 100 --concurrency 8 --repeat-input 100 --output long.jsonl
+```
+
+第一对只改变并发，第二对改变提示重复长度。重复文字的字符数不等于实际 token 数；以返回 usage 或同版 tokenizer 统计为准。
+
+这是固定并发的闭环客户端，记录首个非空内容、总时长、SSE chunk 与 usage。chunk 可能含多个 token，因此 chunk 间隔不是逐 token ITL。小样本 p95 不稳定，不能拿五次预热的分位数作为生产结论。
+
+记录原始样本、输入输出 token 分布、模型与设备、并发模式、失败数和服务端指标。再用具备固定到达率模式的工具补充开放负载实验，避免闭环掩盖排队失稳。
+
+## 确认取消走到资源回收
+
+```bash
+curl -s http://127.0.0.1:8000/metrics > before.prom
+python3 labs/serving/cancel.py
+curl -s http://127.0.0.1:8000/metrics > after.prom
+```
+
+取消脚本在收到首个非空内容后关闭连接，并打印请求标识。它只证明客户端主动结束读取。继续看引擎活动请求、abort 日志与后续新请求能否获得容量；在有限时间内重复采样，而不是期待紧接着的一次抓取必定归零。
+
+重复长生成与取消，观察活动引用是否累积。前缀缓存保留的可淘汰块与活动请求泄漏不同，必须用正确指标和新分配结果判断。
+
+## 缓存、量化和推测各做独立对照
+
+先固定无优化基线，再分别比较前缀缓存冷/热场景、一个兼容量化格式和一个兼容草稿方案。选择方案前检查锁定引擎版本的模型与硬件支持；主线解释机制，项目不编造所有 GPU 都通用的一条启动命令。
+
+每项至少包含短输入、长输入、低并发与容量压力场景。量化同时测独立质量集；推测记录实际接受长度；分层缓存记录搬运与重算。只有结果支持时再组合，组合后重新测量。
+
+## 观测与结束
+
+`labs/observability/` 提供 Prometheus 和 OTLP Collector 配置。开启追踪前检查服务启动参数及 Collector 端点；确认客户端请求可以在后端找到，再讨论关联分析。采集成功本身不是精确 GPU 归因。
+
+保存报告后停止实验容器与观测 compose。根据启动脚本显示的容器名称操作，避免清理其他工作负载。删除性能文件前先导出结论所用原始样本；保留模型与镜像身份方便复跑。

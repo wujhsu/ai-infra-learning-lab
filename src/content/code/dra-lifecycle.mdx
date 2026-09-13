@@ -1,0 +1,51 @@
+---
+title: "设备选择怎样走到节点准备？"
+description: "分别读取调度插件与 kubelet 管理器，避免把 DRA 看成一个同步函数。"
+order: 6
+stage: 1
+minutes: 24
+revision: 2
+status: "preview"
+terms: []
+sources: ["k8s-source", "dra"]
+sessions: []
+prerequisites: ["dra"]
+question: "Filter 通过是否意味着驱动已经把 GPU 提供给容器？"
+answer: "不是。Filter 属于控制面调度阶段，节点侧准备和容器配置发生在后续路径，仍可能失败。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "固定 tag 的入口源码已读取；硬件调用路径待设备上观察"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+前置是 DRA 生命周期。固定 Kubernetes v1.36.0，本任务只追基本对象流与失败边界；驱动实现是另一个仓库，必须依据实际安装驱动继续阅读。
+
+## 控制面从哪里看候选
+
+打开 [DynamicResources.Filter](https://github.com/kubernetes/kubernetes/blob/v1.36.0/pkg/scheduler/framework/plugins/dynamicresources/dynamicresources.go#L748)，先识别 Pod、调度周期状态与候选节点。它处在调度框架中，不是容器内的 GPU 初始化。
+
+继续读同文件 [Reserve](https://github.com/kubernetes/kubernetes/blob/v1.36.0/pkg/scheduler/framework/plugins/dynamicresources/dynamicresources.go#L1144) 与 [PreBind](https://github.com/kubernetes/kubernetes/blob/v1.36.0/pkg/scheduler/framework/plugins/dynamicresources/dynamicresources.go#L1332)。记录每阶段读取、暂存或提交哪些分配信息，以及失败时怎样返回状态。
+
+不要从函数名推断 Reserve 就完成了永久设备准备。调度阶段的保留与节点调用有不同生命周期，并发调度还需要处理冲突和撤销。
+
+## 节点怎样兑现分配
+
+转到 [kubelet DRA Manager.PrepareResources](https://github.com/kubernetes/kubernetes/blob/v1.36.0/pkg/kubelet/cm/dra/manager.go#L227)。沿 Pod 的声明引用寻找分配与驱动信息，再看节点插件调用与本地状态记录。
+
+此处解决“这个节点上的工作负载如何访问已分配设备”。具体硬件准备依赖驱动。阅读时把 Kubernetes 传递的标识和厂商负责的操作分成两列，避免在通用源码中寻找并不存在的通用 GPU 分区实现。
+
+## 回收必须读另一条路径
+
+继续看 [UnprepareResources](https://github.com/kubernetes/kubernetes/blob/v1.36.0/pkg/kubelet/cm/dra/manager.go#L577)。关注消费者引用与清理条件，而不是仅搜索一个 delete 调用。节点重启后如何恢复本地状态，也关系到重复准备与释放是否安全。
+
+画出请求创建、控制面分配、节点准备、使用、节点清理和声明释放。为每个箭头标明负责人和持久状态。遇到失败，先问系统已走到哪里，再决定读调度日志还是节点驱动日志。
+
+## 用事件验证源码理解
+
+实验中创建一个不满足条件的声明，预测它会停在哪里；再创建可分配声明但使用错误容器配置，预测控制面与节点状态的差异。最后删除消费者，检查清理与后续重新分配。
+
+这些集群操作尚未在本次环境执行。源码任务交付是固定版本的对象路径和观察清单；只有实际状态与预测吻合后，才在学习记录中标记该实验完成。

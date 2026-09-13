@@ -1,0 +1,74 @@
+---
+title: "怎样管理数据、模型与运行环境？"
+description: "让同一模型在另一台机器上仍然是同一个实验：权重、分词器、镜像、驱动和存储。"
+order: 29
+stage: 9
+minutes: 8
+revision: 2
+status: "preview"
+terms: ["artifact"]
+sources: ["qwen", "cuda", "checkpoint"]
+sessions: []
+prerequisites: ["speculative-pd"]
+question: "只保存容器 tag 和模型名称，为什么仍可能无法复现？"
+answer: "tag 与名称不足以固定内容；还需要模型 revision、镜像 digest、tokenizer、配置、驱动硬件、数据与评估身份，并检查实际兼容性。"
+bridge: "下一步：训练与推理在集群里怎样运行？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "platform"
+introduces: ["artifact"]
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+前面已经可以训练权重和启动服务。现在把命令交给另一位同事，却发现输出与速度都不同。即使双方都说自己用了“同一个 Qwen”，这句话仍然缺少足够的信息：权重提交、分词器、提示模板、框架构建、精度和硬件可能不一样。
+
+## 一次运行到底由什么组成
+
+<Term id="artifact" /> 是把结果当作可识别的对象管理。训练产出不只是一个权重文件，还包括结构配置、tokenizer、特殊 token、适配器、推理参数和必要的质量报告。源码 commit 描述程序，模型 revision 描述模型仓库内容，镜像 digest 描述容器内容；三者不可互相替代。
+
+本库工程模型固定为 `Qwen/Qwen3-0.6B` 的 revision `c1899de289a04d12100db370d81485cdf75e47ca`。模型卡说明使用入口；下载时也要让 tokenizer 与模型使用同一 revision。[模型卡](https://huggingface.co/Qwen/Qwen3-0.6B)
+
+```json
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+  "engine": "vllm/vllm-openai:v0.29.0",
+  "served_name": "lab-model",
+  "max_model_len": 4096,
+  "chat_template_kwargs": {"enable_thinking": false},
+  "verification": "GPU environment pending"
+}
+```
+
+这是配置示例，最后一项明确未执行。镜像 tag 便于选版本，实际拉取后还应记录 digest；模型仓库 revision 也不代替下载文件的完整性检查。生产发布应让评估结果关联这些不可变身份。
+
+## 容器为什么不能带来整台 GPU
+
+镜像能携带用户态库与程序；设备仍由宿主机驱动管理，运行时需要把设备和相应接口提供给容器。CUDA 工具链、用户态运行库和驱动有兼容要求。容器内看到某个 CUDA 版本，不能单独证明宿主驱动能运行该构建。
+
+先在宿主机检查设备健康与驱动，再在容器内执行一个小张量计算，最后加载模型。若最小计算都失败，直接调 vLLM 的批次参数只会把问题混在一起。记录 GPU 型号、驱动、镜像 digest、启动参数和错误日志，才能让故障可重现。
+
+## 三种数据有三种访问方式
+
+训练数据经常按批次顺序或随机读取，需要考虑大量小文件、解压、shuffle 与缓存；模型权重在启动时大规模读取，容易形成同时扩容的下载洪峰；检查点需要多份状态一致落盘，并支持恢复时重新读取。
+
+因此，不能只用一个“存储吞吐很高”的指标概括全部。对象存储适合版本化的大对象分发；共享文件系统提供挂载语义，但元数据服务和并发读写可能成为瓶颈；本地 NVMe 延迟低，却不能默认节点故障后数据仍存在。
+
+设 8 个副本各下载 4 GiB 权重，源端有效总吞吐只有 1 GiB/s。完全共享这条瓶颈链路时，仅传输总量下界就是 32 秒。实际还有校验、加载和初始化。这是容量估算，不能把单副本 4 秒直接当作全组就绪时间。
+
+## 检查点写完了，还是只开始写
+
+训练进程调用保存函数，不代表一个可恢复版本已经可见。应先写临时位置，等待全部必要分片与元数据完成，再发布一个完整性标记或最终版本指针。对象存储不一定具备本地目录 rename 的同样语义，需要按存储系统设计提交协议。
+
+保留上一个已验证版本，避免新写入中断后只剩残缺结果。验证应包含实际加载与继续一步训练，而不只是确认文件存在。跨机器恢复还要判断设备映射、并行布局和随机状态是否适配。
+
+## 一份可复现记录怎样随系统流动
+
+训练任务输出制品身份和评估报告；推理服务加载该身份；每个请求的观测能关联当前服务版本；回滚选择之前已验证的制品与配置。这条链路让“今天回答变差”可以定位到具体变化，而不是猜测哪台机器上有什么文件。
+
+下一章用 Kubernetes 把进程、存储请求和服务入口表达成可管理对象；这些对象不会替你验证模型质量，但能给生命周期一个清楚的边界。

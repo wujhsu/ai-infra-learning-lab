@@ -1,0 +1,70 @@
+# Kueue v0.19.0 API; isolated CPU admission experiment, cluster execution unverified.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: queue-lab
+  labels: {ai-infra-lab: queue}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata: {name: ai-infra-cpu}
+spec: {}
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata: {name: ai-infra-queue}
+spec:
+  namespaceSelector:
+    matchLabels: {ai-infra-lab: queue}
+  resourceGroups:
+    - coveredResources: [cpu, memory]
+      flavors:
+        - name: ai-infra-cpu
+          resources:
+            - name: cpu
+              nominalQuota: "1"
+            - name: memory
+              nominalQuota: 512Mi
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata: {name: learning, namespace: queue-lab}
+spec: {clusterQueue: ai-infra-queue}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: first
+  namespace: queue-lab
+  labels: {kueue.x-k8s.io/queue-name: learning}
+spec:
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: task
+          image: python:3.12.14-slim
+          command: [python, -c, 'import time; print("started", flush=True); time.sleep(45); print("done")']
+          resources:
+            requests: {cpu: "1", memory: 128Mi}
+            limits: {cpu: "1", memory: 128Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: second
+  namespace: queue-lab
+  labels: {kueue.x-k8s.io/queue-name: learning}
+spec:
+  suspend: true
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: task
+          image: python:3.12.14-slim
+          command: [python, -c, 'import time; print("started", flush=True); time.sleep(45); print("done")']
+          resources:
+            requests: {cpu: "1", memory: 128Mi}
+            limits: {cpu: "1", memory: 128Mi}

@@ -1,0 +1,5 @@
+---
+import {getCollection} from 'astro:content';import Base from '../../layouts/Base.astro';import {asset} from '../../data/curriculum';
+const entries=(await getCollection('advanced')).sort((a,b)=>a.data.order-b.data.order);
+---
+<Base title="进阶研究" active="advanced/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">AI Infra 系统学习库</span><h1>进阶研究</h1><p>先掌握关联章节的机制，再带着一个明确问题深入。环境与验证状态在每篇中单独说明。</p></header><div class="resource-grid">{entries.map(e=><a class="resource-card" href={asset(`advanced/${e.id}/`)}><h2>{e.data.title}</h2><p>{e.data.description}</p><small>{e.data.environment||'阅读与小例子'} · {e.data.verification}</small></a>)}</div></div></Base>

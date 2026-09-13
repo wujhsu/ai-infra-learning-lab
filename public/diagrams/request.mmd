@@ -1,5 +1,0 @@
-flowchart LR
- C[客户端] --> G[网关与路由] --> E[推理引擎] --> U[GPU 计算]
- U --> E --> C
- K[Kubernetes 控制面] -.资源分配与恢复.-> P[Pod 与设备]
- P -.承载.-> E

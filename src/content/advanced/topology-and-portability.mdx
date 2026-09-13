@@ -1,0 +1,51 @@
+---
+title: "设备拓扑、其他加速器与基础设施迁移"
+description: "在主线机制之上研究适用条件、实现选择与可验证的问题。"
+order: 7
+stage: 1
+minutes: 25
+revision: 2
+status: "preview"
+terms: []
+sources: ["dra", "dra-features", "accelerator", "openstack"]
+sessions: ["kubernetes-dra", "openinfra-migration"]
+prerequisites: ["dra", "workloads"]
+question: "两个设备分别满足请求，为什么组合后仍可能不合适？"
+answer: "设备之间的拓扑、带宽、可达性和共享资源关系也需满足要求，单设备属性不是组合约束的充分条件。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "机制研究与资料核验；专题硬件实验未运行；待真实试读"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+DRA 把设备能力表达为请求，计算框架把算子映射到后端。现在研究两种迁移：在同一集群中选择符合拓扑的设备组合，以及把工作负载移到另一类加速器或基础设施。
+
+## 两张“都满足条件”的设备未必满足组合
+
+单独看，一张 GPU 和一张网卡都可用；放在不同 NUMA 域或低带宽路径上，通信表现可能不符合目标。组合约束描述的是关系，不是分别筛选两个列表后随意配对。
+
+<Diagram id="dra-topology" caption="拓扑属性需要一致语义，声明约束、调度能力与驱动实现必须共同支持。" />
+
+DRA 高级拓扑研究要逐项核对属性命名、请求约束、Kubernetes 功能门与驱动支持。不同驱动使用同名字符串，不代表单位和语义一致。会议提案可以指出方向，但不能直接写成当前集群承诺。
+
+## 换加速器时，哪些知识保留
+
+张量形状、前向反向、分片、数据搬运和依赖关系仍然成立。变化的是设备存储层次、执行模型、支持 dtype、编译器、通信库与性能工具。PyTorch API 能调用，并不保证所有算子都有相同后端覆盖与性能。
+
+在 ROCm、TPU 或其他设备上迁移时，先通过小模型数值对照，再检查算子覆盖、精度、同步语义与分布式通信。不得把 CUDA 特有的 warp、流接口和工具命令不加说明地当作所有加速器的统一接口。[PyTorch 加速器文档](https://docs.pytorch.org/docs/stable/accelerator.html)
+
+## OpenInfra 与 Kubernetes 的关系
+
+基础设施层提供计算、网络、存储与隔离；Kubernetes 管理其上工作负载的声明与生命周期。迁移可能改变虚拟机、裸金属、网络或存储接口，但模型服务仍需完成设备、制品、观测和恢复验证。
+
+OpenInfra Migration 会议材料用于理解这些层之间的工程取舍。不要把“换了基础设施平台”理解为自动获得更好的模型吞吐；应检查设备直通、网络路径、存储性能与运维边界。
+
+## 迁移验收从等价开始
+
+选择固定模型与输入，比较数值容差和质量，再测冷启动、稳态、峰值与故障恢复。对于不可直接复用的 kernel 或通信实现，记录替代路径与限制。性能比较要公开硬件预算和软件构建，避免拿不同规模设备得出后端优劣结论。
+
+最终交付是一份依赖清单和证据矩阵：哪些依赖通用、哪些设备特定、哪些已经验证、哪些尚无实现。这样才能把主线能力带到新环境。

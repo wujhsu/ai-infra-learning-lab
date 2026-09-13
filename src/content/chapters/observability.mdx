@@ -1,0 +1,72 @@
+---
+title: "怎样从用户请求追到模型与 GPU？"
+description: "把已有训练与推理测量接成证据链，正确使用指标、日志和追踪。"
+order: 34
+stage: 10
+minutes: 8
+revision: 2
+status: "preview"
+terms: ["metrics", "logs", "trace", "span", "cardinality"]
+sources: ["otel", "prometheus", "vllm-metrics", "otel-genai"]
+sessions: ["llm-observability"]
+prerequisites: ["lws"]
+question: "为什么不能对每个实例的 p99 求平均，得到整个服务的 p99？"
+answer: "分位数不是可直接线性合并的统计量；实例流量与分布也不同。应合并可聚合的分布数据，再按明确口径估计整体分位数。"
+bridge: "下一步：怎样用证据查清三个性能故障？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "platform"
+introduces: ["trace", "span", "cardinality", "metrics", "logs"]
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+从极小模型训练开始，我们已经记录 loss、step 与耗时；从首次推理服务开始，我们记录 TTFT、输出 token 和请求错误。现在要解决更复杂的问题：某一批请求为什么慢，是排队、模型计算、通信，还是节点异常？
+
+## 三种证据各擅长什么
+
+<Term id="metrics" /> 把大量事件聚合成随时间变化的数值，例如等待请求数、每秒输出 token、失败计数和训练 step 时间。它适合发现“何时开始异常、影响多大”，但通常不保留每个请求的完整过程。
+
+<Term id="logs" /> 保存离散事件，例如某个 rank 在某节点出现超时，以及当时的配置与错误栈。结构化字段比一段无法检索的自然语言更便于关联，但不应把提示全文和敏感数据默认写入日志。
+
+<Term id="trace" /> 把一次请求拆成相关联的时间段。<Term id="span" /> 是其中一个有起止时间与属性的操作，如网关处理、引擎排队或模型执行。追踪帮助理解调用路径，不能自动测得每个 GPU kernel 对某个请求的精确贡献。[OpenTelemetry 信号](https://opentelemetry.io/docs/concepts/signals/)
+
+## 先画一条请求的时间线
+
+设请求在 0 ms 到网关，20 ms 进入引擎，排队至 120 ms，Prefill 到 170 ms，首个有效输出在 180 ms 到客户端。客户端 TTFT 是 180 ms，其中排队占 100 ms。即使 GPU 把 Prefill 从 50 ms 优化到 25 ms，若队列继续增长，用户也未必感到改善。
+
+跨组件时间差必须注意时钟同步与测量位置。客户端的首字节、首个 SSE 数据、首个非空内容与第一个模型 token 不是同一个事件。先定义口径，再比较数字。
+
+<Diagram id="correlation" caption="先关联请求、引擎实例、Pod、节点与设备，再结合时间窗口解释现象。设备指标通常是聚合证据。" />
+
+<Slide id="llm-observability-11" steps={["先定位请求进入和开始执行之间的等待段。", "再区分输入处理与后续逐步输出，不把所有耗时叫作 GPU 计算。", "最后检查结束边界与统计口径，再与客户端时间对照。"]} minute="讲者提醒：不同引擎即使都报告“排队时间”，起点也可能不同，例如从 HTTP 接收开始，或从进入调度器开始。比较前应先统一语义。" time="00:12:11" />
+
+阅读会议时间线时，先找到请求进入、等待、执行和输出边界，再判断哪些区间是测得的，哪些是从其他信号推断的。页面展示的是讲者的观测视角，不替代你自己的埋点定义。
+
+## GPU 忙不等于请求都在有效推进
+
+GPU 利用率高可能来自目标计算，也可能来自其他租户、重算或低效 kernel。利用率低可能来自 CPU 数据准备、网络等待或没有足够请求。显存占用高又是容量现象，不能当作计算饱和的证据。
+
+训练应把数据等待、前向、反向、通信、优化器与保存阶段放在同一时间轴；推理应关联等待队列、活动请求、KV 使用、Prefill 与 Decode 工作量。需要更细粒度解释时，再用 profiler 采样执行片段，而不是长期开启最重的分析模式。
+
+## 指标标签怎样既有用又可控
+
+<Term id="cardinality" /> 是指标存储设计的重要约束。模型版本、实例和有限的错误类型通常可管理；把每个 request_id、完整 prompt 或任意用户输入作为标签，会制造不断增长的时间序列。
+
+请求级身份更适合日志与追踪；指标保留有限维度，并在必要时使用 exemplar 等方式指向代表性的追踪。追踪本身也要采样，采样后未见到某种失败不能证明失败不存在。
+
+## 平均值会隐藏谁
+
+两个请求耗时分别是 10 ms 和 990 ms，平均值为 500 ms，无法描述两种完全不同的体验。直方图将观察值放入桶，可用于聚合分布与估计分位数；桶边界决定估计精度。不要把各实例的 p99 再求平均，当作全服务 p99。[Prometheus 直方图说明](https://prometheus.io/docs/practices/histograms/)
+
+同样，token/s 必须说明分母是单请求 Decode 时间、整个实验墙钟时间，还是 GPU 活动时间。训练吞吐应说明是样本、有效 token 还是包含 padding 的 token。
+
+## 建立最小证据包
+
+一次异常记录至少包含：起止时间、受影响请求范围、模型与镜像身份、输入输出长度分布、实例和设备身份、原始指标窗口、相关日志与追踪，以及是否发生发布或资源变更。所有结论标明来自观察还是推断。
+
+下一章把这套证据用于具体故障。目标不是背诵“慢就看 GPU”，而是每次用一个可被证伪的假设缩小范围。

@@ -1,0 +1,55 @@
+---
+title: "一个请求怎样获得本轮 token 与 KV？"
+description: "从 EngineCore.step 追到调度与块分配，再回到完成和取消。"
+order: 5
+stage: 1
+minutes: 24
+revision: 2
+status: "preview"
+terms: []
+sources: ["vllm-source", "vllm", "pagedattention"]
+sessions: []
+prerequisites: ["scheduler", "cache-hierarchy"]
+question: "一次 HTTP 请求是否只调用一次模型执行？"
+answer: "不是。生成通常跨多个引擎回合，每回合可能与其他请求合批，直到结束或取消。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "固定 tag 的入口源码已读取；硬件调用路径待设备上观察"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+前置是请求生命周期、KV 分页与连续批处理。本次固定 vLLM v0.29.0，关注 V1 引擎。生产系统有异步调度等分支，下面先读最容易建立因果关系的基本 step 路径。
+
+## 先读一次执行回合
+
+[EngineCore.step](https://github.com/vllm-project/vllm/blob/v0.29.0/vllm/v1/engine/core.py#L597) 先判断是否有请求，调用 scheduler，提交模型执行并取得输出；随后处理执行期间到达的取消，再更新调度状态。返回值还说明本轮是否实际执行了 token。
+
+画出四个对象：请求状态、SchedulerOutput、模型输出、更新后的请求状态。不要把 API 一次 HTTP 调用等同于一次 engine step；多个请求可以共同参与很多回合。
+
+## 再看调度器决定什么
+
+进入 [Scheduler.schedule](https://github.com/vllm-project/vllm/blob/v0.29.0/vllm/v1/core/sched/scheduler.py#L501)，查本轮 token 预算、运行请求、等待请求和 KV 分配调用。先跟踪一个无前缀命中、无推测的普通请求，再增加分支。
+
+观察点是“请求已有多少已计算 token”和“这轮安排多少新计算”。这两个数与输出 token 数不是同一概念：Prefill 会推进输入位置，推测可能预留其他空间，具体计数要看字段语义。
+
+## KV 不是只按当前输出长度分配
+
+[KVCacheManager.allocate_slots](https://github.com/vllm-project/vllm/blob/v0.29.0/vllm/v1/core/kv_cache_manager.py#L343) 接收新 token、已计算前缀、lookahead 与外部缓存相关信息。先逐项写出参数来自哪里，再看容量不足时如何返回或触发上层处理。
+
+请求数量没变，也可能因为位置增长而需要新块。前缀命中又可能让某些块共享引用。把逻辑位置、物理块、引用与空闲池画成不同对象，才能解释为什么取消一个请求不一定立即销毁所有曾经访问的块。
+
+## 追到取消才算完整
+
+回到 EngineCore.step，关注模型执行期间发生的 abort。已有设备工作可能已提交，取消不一定能瞬间中断 kernel；引擎仍需在一致边界处理输出与请求状态。
+
+继续在同一 tag 搜索 `finish_requests`、`free` 与请求完成路径，记录从状态变化到块引用释放的实际调用关系。项目四的取消脚本只创建触发条件，后端日志与容量复用才是观察结果。
+
+## 最小阅读交付
+
+以 4 个提示 token、最多 3 个输出 token 做纸面跟踪，列每轮新计算、总历史、已分配块与是否结束。再把输入改为部分前缀命中，解释哪些字段改变。
+
+这份路径帮助你定位实现，不提供 GPU 运行成绩。若源码版本升级，首先复核这些入口与字段语义，不把旧行号当作永久接口。

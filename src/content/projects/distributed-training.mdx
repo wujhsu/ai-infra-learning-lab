@@ -1,0 +1,84 @@
+---
+title: "项目三 · 分布式训练"
+description: "先证明多进程计算与单进程等价，再研究通信、分片和恢复。"
+order: 3
+stage: 1
+minutes: 28
+revision: 2
+status: "preview"
+terms: []
+sources: ["ddp", "fsdp", "checkpoint", "nccl"]
+sessions: []
+prerequisites: ["recovery"]
+question: "多卡吞吐提高两倍，但全局批次也翻倍，是否证明达到同一质量所需时间减半？"
+answer: "没有。需要比较相同训练目标下的收敛、有效工作和总时间，区分吞吐实验与达到质量目标的训练效率。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "CPU DDP 与 DCP 恢复对照已运行；GPU/NCCL/FSDP 路径未运行"
+environment: "CPU 双进程；两张及以上 CUDA GPU 扩展"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+<a href={asset('downloads/labs.zip')}>下载全部实验源码 ZIP</a>，或克隆本站仓库。下列命令从仓库根目录执行；ZIP 只包含 `labs/`，涉及 `tests/` 的自动化检查请使用仓库。实际用时取决于安装、下载和设备，本页不把阅读时间当成实验时间。
+
+## 不从“启动了几个进程”开始验收
+
+本项目先用两个 CPU 进程验证梯度语义和检查点，再在 GPU 上研究 NCCL 与 FSDP2。CPU 结果不能证明 GPU 通信性能，但能先排除一类应用逻辑错误。前置是集合通信、DDP、分片和恢复章节。
+
+```bash
+source .venv-training/bin/activate
+torchrun --standalone --nproc-per-node=2 labs/distributed/ddp_check.py
+```
+
+脚本使用四条等长样本，两个 rank 各取两条。从同一初始参数出发，单进程对全局批次更新一次；DDP 对本地批次求损失，再同步梯度更新。比较全部参数，容差 `2e-6`。
+
+实际 CPU/Gloo 运行两个 rank 的最大参数误差均为 `1.4901161193847656e-08`，通过对照。这个结论依赖等大小本地批次和相同损失归一化；改变有效 token 数后，需要按主线说明重新加权。
+
+## 分布式检查点必须能继续更新
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/distributed/checkpoint_check.py --directory results/dcp-check
+```
+
+程序训练一步，用 PyTorch Distributed Checkpoint 保存模型、优化器与步数；原模型继续一步作为基准；新建模型加载后继续同一步，比较全部参数。保存与加载由所有 rank 一起参与，路径必须可被参与进程正确访问。
+
+实际 CPU 双进程恢复后的下一步参数最大误差为 0。
+
+这是固定数据、无 dropout、相同 world size 的恢复检查，不覆盖随机 DataLoader、弹性扩容或真实共享存储故障。真实集群需要保存各 rank 随机状态、采样进度，并验证完整提交与残缺检查点处理。
+
+## 在 GPU 上复查同一语义
+
+```bash
+LAB_DEVICE=cuda torchrun --standalone --nproc-per-node=2 labs/distributed/ddp_check.py
+torchrun --standalone --nproc-per-node=2 labs/nccl/allreduce.py
+```
+
+需要两张可访问的 CUDA GPU 与匹配的 PyTorch 构建。第一条仍然验证参数语义；第二条检查已知输入的 AllReduce 并记录通信时间。不要把两者混为同一种性能测试。
+
+多节点时要为每台机器提供一致的节点总数、不同 node rank、可达主地址与端口。先用小数据验证，再测试真实消息规模；记录各 rank 开始与结束时间，避免只保留最终超时的一方。
+
+## 从 DDP 走到 FSDP2
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/distributed/fsdp_train.py
+```
+
+脚本将各模型块与整体包装为 FSDP2 分片单元，再建立优化器。观察模型使用的参数、通信与峰值显存，并与 DDP 的同形状模型比较。极小模型常被固定开销主导，不能拿它推断大模型扩展收益。
+
+FSDP2 GPU 路径尚未运行。分布式检查点的 CPU 对照验证了相关保存加载接口的基本路径，但不替代 FSDP DTensor、跨 world size 重分片与多节点存储验证。应在真实设备上把检查点步骤接入分片模型，再比较下一次更新。
+
+## 扩展效率要保持比较条件
+
+固定总工作量时，速度提升为单卡时间除以多卡时间；再除以 GPU 数得到一种强扩展效率。若每卡批次固定，总工作量也随卡数增加，属于不同实验口径。两者都可以研究，但不能放在同一列直接比较。
+
+记录有效 token/s、每步时间、峰值显存、通信等待、检查点时间与验证损失。吞吐更高却改变了全局批次和收敛行为，尚不能说明达到同一质量更便宜。
+
+## 故障注入与清理
+
+实验环境让一个 rank 提前退出，验证其余 rank 在有限超时内失败并留下证据；下一次从完整检查点恢复。再准备缺失文件的副本，确认系统拒绝残缺版本而不静默重新初始化。
+
+不要在共享生产目录试删分片。清理只删除本次 `results/dcp-check`，并在报告中保留目录内容清单与恢复比较。最终交付应能回答“每个 rank 持有什么、同步什么、失败时从哪里重建”。

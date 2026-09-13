@@ -1,0 +1,51 @@
+---
+title: "大规模训练：怎样选择并行系统"
+description: "在主线机制之上研究适用条件、实现选择与可验证的问题。"
+order: 1
+stage: 1
+minutes: 25
+revision: 2
+status: "preview"
+terms: []
+sources: ["megatron", "deepspeed", "ray-train"]
+sessions: []
+prerequisites: ["recovery"]
+question: "为什么 Ray worker 数、TP 度和 DP 度不能简单当作同一参数？"
+answer: "它们分别描述执行组织与不同计算/状态划分；需明确每个进程参与哪些通信组和持有哪些数据。"
+bridge: "继续把这一章的机制放回下一步计算与系统行为中。"
+verification: "机制研究与资料核验；专题硬件实验未运行；待真实试读"
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+读完分布式训练后，再看 Megatron、DeepSpeed 与 Ray，会发现它们并不处在同一抽象层。选择系统之前，先写出当前缺口：模型放不下、通信太慢、任务编排复杂，还是恢复流程不完整。
+
+## 把并行看成状态与通信的设计
+
+数据并行复制模型、划分样本；状态分片减少持久副本；张量并行划分一层计算；流水线并行划分层；专家并行按路由分发 token。这些机制会形成不同通信组，不能只把并行度相乘后停止分析。
+
+假设 16 张 GPU，TP=4、PP=2、DP=2。先画出每个 rank 的三维坐标，再分别圈出 TP、PP 与 DP 组。TP 内频繁通信通常希望放在高带宽区域；PP 跨阶段传激活；DP 或分片组同步训练状态。具体组合是否合理，取决于模型结构、微批次与拓扑。
+
+Megatron Core 提供可组合的模型并行机制，适合在这些维度上研究大规模训练；其策略文档应与目标模型和硬件一起阅读。[官方并行指南](https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/parallelism-guide.html)
+
+## 状态分片与卸载改变了什么
+
+DeepSpeed ZeRO 按阶段减少优化器、梯度与参数的重复持有。CPU 或其他层卸载可以扩大容量，但引入数据搬运与主机资源成本。容量从“装不下”变成“能运行”可能很有价值，却不能直接推断训练更快。[ZeRO 教程](https://www.deepspeed.ai/tutorials/zero/)
+
+与 FSDP2 比较时，先保持同一模型、数据、全局批次、精度和检查点目标，再比较峰值、通信、收敛与恢复。默认配置不同导致的差异不能归为框架本质。
+
+## 编排不会替代训练算法
+
+Ray Train 关注分布式训练工作者与运行生命周期等组织能力；应用仍要提供正确训练与检查点逻辑。自动重启只有接上完整状态恢复，才减少已完成工作的损失。[恢复文档](https://docs.ray.io/en/latest/train/user-guides/fault-tolerance.html)
+
+把“管理几个 worker”和“参数怎样分片”分开，可以避免为了任务管理而重写全部模型，或期待一个编排器自动解决梯度同步。
+
+## 研究任务
+
+选择一份已经跑通的单机训练，先用 DDP 建立基线，再只增加一种状态分片方案。记录初始成本、每步时间、检查点、失败恢复与达到固定验证目标的总时间。容量不足时再讨论模型并行；没有瓶颈证据，不先堆叠全部机制。
+
+最后给出选择理由与退出条件：哪些模型大小、节点规模或故障要求出现时，需要重新评估技术栈。这比列出三个安装命令更接近真实工程决策。

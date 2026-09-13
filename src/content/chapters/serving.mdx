@@ -1,0 +1,91 @@
+---
+title: "从模型文件到可测量的推理服务"
+description: "把训练后的制品加载成服务，完成首次流式调用与基础测量，再进入引擎内部。"
+order: 23
+stage: 7
+minutes: 10
+revision: 2
+status: "preview"
+terms: []
+sources: ["vllm-serving", "vllm", "qwen", "vllm-metrics"]
+sessions: []
+prerequisites: ["recovery", "kv-reuse", "gpu-memory"]
+question: "进程在运行、健康接口正常，但首个正文很慢，是否足以说明 GPU 计算慢？"
+answer: "不足。还要拆开输入处理、队列、模型执行、输出处理与网络，并核对是否包含思考内容等不同口径。健康与业务延迟是不同指标。"
+bridge: "下一步：KV 显存怎样计数、分配和回收？把本章的数据与状态继续放进下一段执行过程。"
+verification: "机制与代码审校；待真实试读"
+project: "inference"
+introduces: []
+requires: []
+---
+import Term from '../../components/Term.astro';
+import LearningFigure from '../../components/LearningFigure.astro';
+import Demo from '../../components/Demo';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import {asset} from '../../data/curriculum';
+
+训练得到的是模型状态，用户需要的是一个持续运行的服务。服务要加载模型、接受请求、分配计算资源、产生输出并处理结束或失败。现在把第一章的生成循环放到一个真实引擎中。
+
+## 先区分模型、引擎与 API 服务
+
+模型定义数值计算与参数；推理引擎安排模型怎样在设备上执行，管理批次、缓存与并行；API 层接收用户请求，处理协议与结果返回。一个项目可以把它们放在同一进程，也可以拆成多个进程。
+
+vLLM 是我们主要观察的实现。它支持相应模型架构和服务接口，但不会让任意自写模型自动可用。极小模型用于学习机制；工程线加载支持稳定的 Qwen3-0.6B，并逐项对照真实结构。
+
+## 加载模型之前要固定哪些输入？
+
+同一个模型名字可能指向不同文件版本。项目固定模型 revision，记录引擎镜像版本和实际拉取的镜像 digest，并保存运行参数。分词器、配置和权重共同参与行为，不能只下载一个权重文件。
+
+服务基线使用 `vllm/vllm-openai:v0.29.0` 和固定 Qwen revision。实际 GPU、驱动与镜像支持需要在目标环境检查；CPU 上的小模型测试不构成这套 CUDA 环境的验证。
+
+```bash
+cd labs/serving
+python3 prepare.py
+bash serve.sh
+```
+
+prepare 写出可检查的实验配置；serve 拉取镜像、记录 digest，并在本机 8000 端口启动服务。模型文件会缓存到实验目录，第一次启动包含下载与加载时间。完整清理说明在推理项目中。
+
+## 为什么启动了进程，还要等服务就绪？
+
+启动可能包括权重读取、设备初始化、内存规划、编译或图准备。进程存在不表示模型已经可接收请求；探测接口通过也不等于所有业务负载的延迟已达标。
+
+先查看启动日志，确认模型、revision、精度、最大长度和设备分配符合预期。然后调用模型列表或健康接口，再执行一个有明确输入和输出上限的请求。
+
+```bash
+curl http://127.0.0.1:8000/v1/models
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"lab-model","messages":[{"role":"user","content":"用一句话解释缓存。"}],"max_tokens":64,"stream":true,"chat_template_kwargs":{"enable_thinking":false}}'
+```
+
+这里 `lab-model` 是服务端配置的名称；输出上限控制最多生成多少 token。关闭 thinking 是为了让入门测量集中观察正文流，不把模型内部推理内容与首个正文字符混在一起。
+
+这条命令的预期是合法的流式响应和结束事件，不是某句固定文字。真实生成质量和精确措辞不能从手工教学词表推断。
+
+## 从一次请求看到引擎循环
+
+请求经过输入处理成为 ID，进入引擎等待调度。调度器按剩余工作与资源预算选择本轮计算，模型执行器运行相应步骤，然后把输出和完成状态交回调度器。
+
+这个循环不等于每个请求各自独占一个完整 Python for 循环。为了提高利用率，引擎会把多个请求的不同阶段组织成批次，同时维护各自的 KV 与生成状态。
+
+<Diagram id="engine" caption="真实推理引擎的主循环：请求 → 调度与缓存预算 → 模型执行 → 输出与状态更新 → 下一轮或释放" />
+
+后面的源码阅读将从固定版本 EngineCore.step 进入调度和 KV 分配。现在先知道各对象负责什么，避免把服务入口、模型 runner 与调度器混为一体。
+
+## 第一次测量就保留基础指标
+
+项目的流式客户端记录首个非空正文时间、完整结束时间、数据块与服务端 usage。它明确区分网络 chunk 与 token：一个 chunk 可以为空，也可以携带多个 token。
+
+```bash
+python labs/serving/measure_stream.py --requests 20 --concurrency 1 --output /tmp/serving-baseline.jsonl
+```
+
+先从低并发验证功能，检查错误和是否收到完整结束事件。少量样本的 p95 不稳定，不能当作正式容量结论；这只是建立测量管道。
+
+## 如果失败，从哪一层查？
+
+连接失败先检查监听与进程；模型名称错误先看服务列表；设备或加载错误看启动日志；长输入失败核对实际 token 数与配置上限；请求一直等待则需要区分队列与模型执行。
+
+不要同时更换模型、镜像、精度和并发。保留能够成功的一条基线，再逐项改变。下一章先算清 KV 如何消耗和复用显存，之后再观察调度为什么决定延迟。
