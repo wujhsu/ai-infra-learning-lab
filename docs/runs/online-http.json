@@ -1,0 +1,63 @@
+[
+  {
+    "path": "",
+    "status": 200,
+    "bytes": 54595
+  },
+  {
+    "path": "read/generation/",
+    "status": 200,
+    "bytes": 66105
+  },
+  {
+    "path": "read/attention/",
+    "status": 200,
+    "bytes": 69207
+  },
+  {
+    "path": "read/dra/",
+    "status": 200,
+    "bytes": 65341
+  },
+  {
+    "path": "projects/tiny-model/",
+    "status": 200,
+    "bytes": 56230
+  },
+  {
+    "path": "code/vllm-request/",
+    "status": 200,
+    "bytes": 51688
+  },
+  {
+    "path": "pagefind/pagefind.js",
+    "status": 200,
+    "bytes": 45555
+  },
+  {
+    "path": "images/gpu-data-movement.webp",
+    "status": 200,
+    "bytes": 122724
+  },
+  {
+    "path": "downloads/labs.zip",
+    "status": 200,
+    "bytes": 26771
+  },
+  {
+    "path": "learn/01-request/",
+    "status": 404
+  },
+  {
+    "path": "labs/01-serving/",
+    "status": 404
+  },
+  {
+    "path": "topics/01-kernelagent/",
+    "status": 404
+  },
+  {
+    "path": "foundations/",
+    "status": 404
+  }
+]

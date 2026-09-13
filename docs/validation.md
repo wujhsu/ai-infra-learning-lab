@@ -36,4 +36,15 @@
 
 ## 发布
 
-使用 GitHub Actions 干净构建并部署。部署后的 HTTP、旧 URL 404 与搜索验证另在最终交付中记录；未完成部署前不宣称线上已更新。
+2026-09-13 已将 `d3b4449` 使用 GitHub Actions 干净构建并部署至现有 GitHub Pages。[构建与部署记录](https://github.com/wujhsu/ai-infra-learning-lab/actions/runs/34753120069)。Linux CI 也实际执行通过 TypeScript/Python 测试、双进程 CPU DDP 与 DCP 恢复检查。
+
+部署后实际验证：
+
+- 首页、生成/Attention/DRA 章节、极小模型项目、vLLM 源码阅读均返回 HTTP 200。
+- Pagefind 脚本、GPU 图与实验 ZIP 下载返回 HTTP 200。
+- 旧 `/learn/01-request/`、`/labs/01-serving/`、`/topics/01-kernelagent/`、`/foundations/` 返回 HTTP 404；构建检查同时确认全部旧路由均未生成。
+- 线上浏览器中 ResourceClaim 与“梯度”均返回新内容及段落链接；ResourceClaim 首项为新 DRA 章节，概念入口直接指向首次讲解。
+- 直接访问并刷新 Attention 章节仍可阅读；无横向溢出或失效的已加载图片资源。
+- 线上手机宽度下术语卡片贴底、内容正确，Escape 关闭后焦点恢复。
+
+原始 HTTP 检查结果见 `runs/online-http.json`。像素级视觉审阅、真实试读以及 GPU/集群实验仍保留上述限制。
