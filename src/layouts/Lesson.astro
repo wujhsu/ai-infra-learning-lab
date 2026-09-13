@@ -1,0 +1,20 @@
+---
+import Base from './Base.astro';
+import sources from '../data/sources.json';
+import glossary from '../data/glossary.json';
+import {asset,modules,titles} from '../data/curriculum';
+const {entry,headings=[],kind='learn'}=Astro.props;const d=entry.data;const isLesson=kind==='learn';const index=titles.findIndex(x=>x[0]===entry.id);const prev=titles[index-1],next=titles[index+1];
+---
+<Base title={d.title} description={d.description} active={isLesson?'path/':kind+'/'}>
+<div class="lesson-shell" data-record={`${kind}/${entry.id}`}>
+ <div class="lesson-utility"><a href={asset(isLesson?'path/':kind+'/')}>← {isLesson?modules[d.module].title:kind==='labs'?'动手实验':'深入专题'}</a><span>{isLesson?`${String(index+1).padStart(2,'0')} / 24`:'专题阅读'} · {d.minutes} 分钟，含思考</span></div>
+ <header class="lesson-head"><div class="eyebrow">{isLesson?`模块 ${d.module+1} · ${modules[d.module].title}`:'学习实验室'}</div><h1>{d.title}</h1><p>{d.description}</p><a data-resume class="resume-link" hidden>回到上次阅读的位置 →</a></header>
+ <div class="reading-grid"><aside class="reading-aside"><details><summary>这一节的路标</summary><nav aria-label="本节目录">{headings.filter((h:any)=>h.depth===2).map((h:any)=><a href={`#${h.slug}`}>{h.text}</a>)}<a href="#self-check">理解检查</a><a href="#learning-notes">记录与复习</a></nav></details><details><summary>前置知识</summary>{d.prerequisites.length?d.prerequisites.map((id:string)=><a class="aside-link" href={asset(`learn/${id}/`)}>{titles.find(x=>x[0]===id)?.[1]||id}</a>):<p>会读基本代码即可。遇到术语可就地展开。</p>}</details><details><summary>本节术语</summary>{d.terms.map((id:string)=>{const t=glossary.find(x=>x.id===id);return t&&<button class="term aside-term" data-term={id}>{t.name}</button>})}</details><a class="aside-link" data-foundation href={asset('foundations/')}>数学与软件基础补课 →</a></aside>
+ <article class="prose" data-pagefind-body><p class="sr-only" data-pagefind-weight="0.5">本节术语检索：{d.terms.map((id:string)=>{const t=glossary.find(x=>x.id===id);return t ? [t.name,t.full,...t.aliases].join(' / ') : '';}).join('；')}</p><slot/>
+ <section id="self-check" class="self-check"><span class="eyebrow">停下来，解释一次</span><h2>理解检查</h2><p>{d.question}</p><details><summary>先自己回答，再看参考思路</summary><p>{d.answer}</p></details><p class="muted">能够换一个例子解释，比记住术语更重要。</p></section>
+ {d.lab&&<a class="lab-link" href={asset(`labs/${d.lab}/`)}><span>把理解带到系统里</span><strong>打开本节关联实验 →</strong></a>}
+ <section class="sources-section"><h2 id="sources">证据与版本</h2><p class="muted">{d.verified}。核验日期：2026-09-13。</p>{d.sources.map((id:string)=>{const s=sources.find(x=>x.id===id);return s&&<div class="source-item"><a href={s.url} target="_blank" rel="noopener">{s.title} ↗</a><small>{s.kind} · {s.version}</small></div>})}{d.sessions.length>0&&<p>关联会议：{d.sessions.map((id:string)=><a class="session-chip" href={asset(`sessions/${id}/`)}>{id}</a>)}</p>}</section>
+ <section id="learning-notes" class="learning-notes"><h2>把这一节留在自己的知识里</h2><div class="status-checks">{[['read','已阅读'],['understood','能解释'],['lab','实验完成'],['bookmark','加入书签'],['review','需要复习']].map(([field,label])=><label><input type="checkbox" data-record-field={field}/>{label}</label>)}</div><label for="lesson-note">用自己的话写下结论，或记一个还没想明白的问题</label><textarea id="lesson-note" data-note rows="5" placeholder="例如：KV 命中并不一定节省时间，因为……"></textarea><small data-save-status>记录仅保存在当前浏览器，可在「学习记录」中导出。</small></section>
+ {isLesson&&<nav class="lesson-pager" aria-label="前后课程">{prev?<a href={asset(`learn/${prev[0]}/`)}><small>上一节</small>{prev[1]}</a>:<span/>}{next?<a href={asset(`learn/${next[0]}/`)}><small>接下来</small>{next[1]} →</a>:<a href={asset('notebook/')}><small>主线完成</small>回顾我的学习记录 →</a>}</nav>}
+ </article></div></div>
+</Base>

@@ -1,0 +1,51 @@
+---
+title: "实验 06 · 从单机多卡到多节点与 PD"
+description: "先验证通信，再增加并行与传输边界。"
+order: 6
+module: 1
+minutes: 25
+prerequisites: ["12-disaggregation", "13-parallelism", "14-collectives"]
+terms: ["tp", "pp", "rank", "kv-cache", "gpu", "dtype"]
+sources: ["vllm-distributed", "vllm-pd"]
+sessions: []
+question: "PP=2 和 Prefill/Decode 分离是一回事吗？"
+answer: "不是。PP 沿模型层切分阶段；PD 将输入处理与后续生成分到不同实例，需要额外 KV 交接。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+需要多张 NVIDIA <Term id="gpu" label="GPU" />，跨节点部分还需要可达的网络与一致运行环境。先完成实验 07 的通信正确性，避免直接用完整模型调试网络。
+
+## 单机 TP 基线
+
+在相同固定镜像中，为支持的模型增加 `--tensor-parallel-size 2`，保持模型 revision、长度与负载。检查模型头数等条件是否兼容切分。记录两张 GPU 的显存、吞吐与延迟，不预设提升比例。
+
+## 两节点 MP 配置
+
+vLLM 当前文档提供多节点 multiprocessing 入口。以下是每节点一 GPU、<Term id="tp" label="TP" />=1、<Term id="pp" label="PP" />=2 的命令形状；模型必须支持相应 PP，所有节点使用同一模型 revision 和版本。
+
+```bash
+# 节点 0；MASTER_ADDR 设置为实际可达地址
+vllm serve Qwen/Qwen2.5-0.5B-Instruct --revision "$MODEL_REVISION" \
+ --tensor-parallel-size 1 --pipeline-parallel-size 2 \
+ --nnodes 2 --node-rank 0 --master-addr "$MASTER_ADDR" \
+ --served-model-name lab-model --max-model-len 4096
+# 节点 1：相同参数，但 node-rank=1 并增加 --headless
+```
+
+正式执行前用锁定镜像 `vllm serve --help` 核对参数。保存每个 rank 的日志与网络路径；不要把 host IP、容器 IP 和 GPU 编号混用。
+
+## PD 作为独立对照实验
+
+PD 分离不等于 PP。前者切分输入与输出阶段，后者切分模型层。使用 vLLM 0.29.0 仓库同 tag 的 connector 示例，先读兼容矩阵，再选择与硬件一致的路径。
+
+记录模型、KV <Term id="dtype" label="dtype" />、布局、TP/PP、connector 版本及传输字节。验证传输失败、取消与超时清理；若没有完成这些，不标为可可靠运行的 PD 系统。
+
+## 验收与清理
+
+提交单卡、单机多卡、跨节点三组原始结果，以及额外 PD 对照（实际运行时）。比较相同长度分布与并发，不把不同 GPU 数下的总吞吐误写成单请求速度。
+
+停止所有 rank 的服务与相关运行时，检查节点 GPU 进程、监听端口和缓存分配均已回收。硬件实验未在作者本机执行。

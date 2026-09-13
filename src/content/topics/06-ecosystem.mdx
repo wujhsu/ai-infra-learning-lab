@@ -1,0 +1,40 @@
+---
+title: "大会全景：从机器到有效 token"
+description: "把上午 Keynote 中的趋势放回具体系统问题，不把宣传数字当学习结论。"
+order: 6
+module: 1
+minutes: 25
+prerequisites: ["01-request"]
+terms: ["gpu", "slo", "kv-cache", "controller", "dra"]
+sources: ["schedule", "accelerator", "dra"]
+sessions: ["2026-09-08-keynotes", "2026-09-09-keynotes"]
+question: "为什么“GPU 利用率更高”不自动等于“有效 token 成本更低”？"
+answer: "有效产出还依赖回答质量、延迟、错误、缓存与资源成本。更忙可能来自无效工作、通信或等待，需要端到端口径。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+两天上午包含多个短演讲，主题从开源生态、异构硬件到 Agent 运行时。它们适合帮助你判断“这件事发生在哪一层”，但不足以独立证明某个系统的实现与性能。
+
+## Token factory 改变了什么问题
+
+机器数量和 <Term id="gpu" label="GPU" /> 忙碌率是资源视角，有效 token 和用户服务目标是产出视角。前者容易计数，后者更接近业务价值，但必须定义输出质量、延迟、成本和失败率。一个无效回答产生再多 token，也不代表有效产出更多。
+
+## 异构硬件需要抽象边界
+
+GPU、NPU、XPU 等加速器并存，框架希望上层表达共同行为，底层保留优化能力。PyTorch Generalization 和 <Term id="dra" label="DRA" /> 分别在框架与资源控制层处理这种问题。它们是不同层的抽象，不能互相替代。
+
+## Agent 拉长了生命周期
+
+一次 Agent 任务可能包含多轮模型调用、工具访问和状态变化。缓存、权限、日志和恢复都不能只跟单个 HTTP 请求绑定。进程结束不等于外部影响消失，会话结束也需要释放不再使用的资源。
+
+<Slide id="2026-09-08-keynotes-8" />
+
+## 看短演讲时留下三个问题
+
+它要解决哪个具体痛点？解决方案依赖什么条件？有什么公开文档、代码或实验能支持？把尚无证据的性能数字留在“讲者报告”中，不强行编成通用知识。
+
+两条 Keynote 录音都存在边界限制：开始时间与官方开场不完全重合，第二天录音没有覆盖全部后段。资料库保留覆盖说明，不根据缺失录音补写不存在的现场内容。

@@ -1,0 +1,55 @@
+---
+title: "为什么 Pod Running 还不够？"
+description: "把分布式启动看成一组共同条件，而不是若干独立的容器状态。"
+order: 18
+module: 5
+minutes: 25
+prerequisites: ["17-dra"]
+terms: ["lws", "pod", "rank", "nccl", "gpu", "tp", "pp"]
+sources: ["lws", "lws-api", "lws-preflight"]
+sessions: ["lws-preflight"]
+question: "为什么单独运行一个网络测试 Job 成功，不能证明即将启动的 LWS 工作组一定健康？"
+answer: "Job 可能使用不同节点、设备、网络、挂载和身份。需要在实际工作组条件下进行本地及全组检查，并确认所有 rank 满足相同协议。"
+lab: "10-preflight"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+一个模型用 16 张 <Term id="gpu" label="GPU" /> 协作，只要一个 rank 的网络或驱动有问题，整个服务可能无法正常输出。等模型加载和通信初始化耗费很久后才发现故障，会浪费整组资源。
+
+## LeaderWorkerSet 表达什么
+
+<Term id="lws" /> 管理 leader 与 worker Pod 组成的工作组，一个组可以对应一个模型副本。组内发现、启动顺序和重启策略属于它要表达的生命周期语义；模型本身如何分片和通信仍需推理引擎配置。
+
+先区分服务副本数与组大小。两个副本、每组四个成员，意味着两套工作组，而不是一个八成员模型。阅读配置时把 replica、group size、rank 和 <Term id="tp" label="TP" />/<Term id="pp" label="PP" /> 分开。
+
+## 为什么用 init container 检查
+
+init container 在主要应用容器启动前执行，能够在相同 <Term id="pod" label="Pod" /> 的设备、网络、存储和身份条件下阻断后续启动。独立 Job 可能落在不同节点，无法证明实际 placement 健康；sidecar 则未必天然阻断服务进程加载。
+
+<Slide id="lws-preflight-4" minute="讲义比较 sidecar、startupProbe、独立 Job 和 Operator，强调检查环境与真实工作负载 placement 一致的价值。" />
+
+## 从便宜检查到昂贵检查
+
+先检查配置、挂载、驱动和设备可见性；再检查 DNS、对端发现与网络；然后执行成对带宽测试和全组 collective；最后做小规模模型 smoke test。每一层失败时都记录原因，避免昂贵步骤继续运行。
+
+<Slide id="lws-preflight-10" minute="讲义按 OS/mount、GPU/NIC、fabric、collective/runtime 分层。妙记约 00:05:38 起提到旧驱动导致网络路径退化的案例，说明仅检查进程存活不够。" time="00:05:38 起" />
+
+## 全组结论如何形成
+
+检查需要确定 rank/world、对端地址、超时和共享 verdict。任意 rank 失败时，不能让其他成员带着局部成功进入服务阶段。退出码可以阻断当前 Pod，但全组恢复仍需要控制器和明确策略。
+
+<Diagram id="preflight" caption="各 rank 完成本地与通信检查，形成全组结论；失败有预算，证据先保存。" />
+
+## 重启为什么会变成问题
+
+如果每次 init 失败都触发整组重建，可能陷入无限循环。日志丢失、故障节点继续被选中、资源持续消耗。需要最大重试预算、失败分类、证据保留和停止条件。
+
+会议讲义中的 `maxGroupRestarts` 等形态属于相关提案讨论。教材使用 LWS 0.10.0 的已发布 API，并把这些字段作为提案分析，不擅自加入可执行清单。实际部署先用 `kubectl explain` 和 CRD schema 验证支持范围。
+
+## 让一次故障产生下一次可用的知识
+
+至少区分重试、重新调度和停止：短暂网络抖动可以有限重试；单节点硬件故障可能需要隔离与重新调度；模型版本不匹配应停止并修正配置。记录“检查名、rank、节点、开始结束、退出码和原因”，比只记录一个最终 failed 更有用。

@@ -1,0 +1,67 @@
+---
+title: "实验 10 · 让失败发生在模型加载前"
+description: "验证本地检查、全组检查与有限失败处理，不把局部通过当整体通过。"
+order: 10
+module: 3
+minutes: 25
+prerequisites: ["18-lws"]
+terms: ["lws", "rank", "pod", "nccl", "allreduce", "gpu"]
+sources: ["lws", "lws-api", "lws-preflight", "vllm-distributed"]
+sessions: []
+question: "为什么 leader 等所有 worker 完成 init，同时 worker 等 leader Ready，可能死锁？"
+answer: "两个条件相互依赖，任何一方都无法先满足。必须设计 init 阶段可用的发现方式和启动顺序，不能只套用服务 Ready 条件。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+需要完成多节点通信基线以及 <Term id="lws" label="LWS" /> 0.10.0 安装。先读取已安装 CRD，确认实际字段；会议提案里的重启预算字段不能未经核对直接应用。
+
+## 本地检查只是第一层
+
+```bash
+bash labs/kubernetes/preflight.sh
+```
+
+脚本验证设备、PyTorch runtime 和可选对端 DNS，并打印结构化结果。它明确不提供全组成功结论。挂载、模型 revision、网络接口和设备拓扑可按环境增加检查，但每项都必须有失败退出码。
+
+## 再执行全组 collective
+
+把实验 07 的 <Term id="allreduce" label="AllReduce" /> 放到所有 rank 的预检阶段，固定 rendezvous 与超时。任意成员失败时，全组不得进入模型服务阶段。保存每个 rank 的开始、结束、节点和检查结果。
+
+在 LWS 中集成前，先验证 init-phase peer discovery 是否适用于当前 startup policy，避免 leader 等 worker、worker 又等 leader Ready 的循环。参考同版本官方示例，不只复制一段 init container。
+
+## 直接生成两节点 LWS 实验配置
+
+实验包提供 `render-lws.py`，使用 LWS 0.10.0 的实际 v1 字段和 vLLM 0.29.0 的多节点 MP 参数。需要至少两个能互通的 <Term id="gpu" label="GPU" /> 节点，每节点 1 张兼容 GPU；先完成实验 07 的网络基线。此配置经过字段和命令核对，尚未在真实集群运行。
+
+```bash
+# 使用实验 01 中解析出的 40 位模型 commit，而不是模型分支名
+python3 labs/kubernetes/render-lws.py --model-revision "$MODEL_REVISION" > lws.generated.json
+kubectl create namespace inference-lws-lab --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply --dry-run=server -f lws.generated.json
+kubectl apply -f lws.generated.json
+kubectl -n inference-lws-lab get pods -w
+kubectl -n inference-lws-lab logs vllm-lab-0 -c engine
+kubectl -n inference-lws-lab port-forward svc/vllm-lab 8000:8000
+```
+
+生成器把 AllReduce 检查装入 ConfigMap，两个成员先通过真实 collective，再进入 vLLM。使用 `LeaderCreated` 让 worker 在 leader 创建后启动，避免等待 leader 的服务 Ready。反亲和要求两个 <Term id="pod" label="Pod" /> 落在不同节点；如果集群只有一个可用节点，Pending 是预期约束结果。
+
+这只是“先 collective、再运行服务”的教学门禁：worker 的 readiness 表示预检通过与进程存活，完整服务是否可用仍由 leader `/health` 和实际请求确认。组级超时、启动失败后的有限重试与故障分类需要外层编排；它没有伪装成会议预检提案的完整实现。
+
+端口 29501 用于预检 rendezvous，29500 用于引擎主协调；<Term id="nccl" label="NCCL" /> 还可能使用其他连接。按实际集群配置网络，不要只开放这两个端口就假定通信正常。镜像可用 `--image` 固定为你记录的 digest。
+
+## 两个受控失败场景
+
+为实验实例提供错误的对端地址，确认等待有超时；再让一个 rank 的检查显式失败，确认其他成员不会部分进入 serving。不要用无限重启来“修复”固定错误配置。
+
+预算和组恢复由实际控制器/外层实验编排负责。若当前版本不提供计划中的字段，用明确的外部停止条件记录实验边界，不伪造 API 支持。
+
+## 验收与清理
+
+提交正常通过、DNS 超时、单 rank 失败三组日志和状态。至少证明模型加载在失败情况下没有继续。保存失败 Pod 证据后再清理工作组、预检资源和残留进程。
+
+独占实验 namespace 的清理命令：`kubectl delete namespace inference-lws-lab`。它会删除该 namespace 中的实验资源。

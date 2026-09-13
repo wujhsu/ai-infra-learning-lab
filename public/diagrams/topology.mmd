@@ -1,0 +1,12 @@
+flowchart TB
+ subgraph A[节点 A]
+  CA[CPU / NUMA 0] ---|PCIe| GA[GPU 0]
+  CA ---|PCIe| NA[NIC]
+  GA ---|NVLink：仅支持平台| GA2[GPU 1]
+ end
+ subgraph B[节点 B]
+  CB[CPU / NUMA 0] ---|PCIe| GB[GPU 0]
+  CB ---|PCIe| NB[NIC]
+  GB ---|NVLink：仅支持平台| GB2[GPU 1]
+ end
+ NA <-->|跨节点网络| NB

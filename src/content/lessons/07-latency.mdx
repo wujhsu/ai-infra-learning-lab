@@ -1,0 +1,63 @@
+---
+title: "为什么首个 token 很慢？"
+description: "先把排队、Prefill 和输出拆开，再判断应该优化哪里。"
+order: 7
+module: 2
+minutes: 25
+prerequisites: ["06-vllm"]
+terms: ["ttft", "prefill", "decode", "tpot", "itl", "slo", "sse"]
+sources: ["vllm-metrics", "prometheus", "vllm-serving"]
+sessions: ["llm-observability"]
+question: "如果 TTFT 为 1.45 秒、总共输出 32 个 token，后续平均每个 40 ms，总耗时是多少？哪部分能由缩短输出改善？"
+answer: "总时间约为 1.45 + 31×0.04 = 2.69 秒。缩短输出减少后续生成时间，不能直接消除已经发生的排队和 Prefill。"
+lab: "04-latency"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+假设你发出一个问题，等了 15 秒才看到第一段回答，但之后输出很快。另一台服务 1 秒就开始输出，却每隔半秒才出现一点内容。两者都可能被简单的“总耗时”掩盖；用户感受到的慢，其实发生在不同阶段。
+
+## 首 token 之前，时间流向哪里
+
+<Term id="ttft" /> 是从约定起点到首个输出 token 的时间。客户端口径可能包括网络、网关、排队、分词、调度和 Prefill；引擎内部口径可能只包含其中一部分。比较两个数字前，先确认起止事件一致。
+
+<Term id="prefill" /> 处理输入前缀并构建缓存，通常能在一次前向计算中并行处理多个位置。首次采样产生输出后，后续生成进入 <Term id="decode" />。前者和后者对资源的需求不同，因此“首 token 快”和“持续输出快”需要分别测量。
+
+## 一张图，逐段看清等待
+
+先看原图上方的完整请求，再看中间的等待和计算。图上各条横线不一定首尾无缝相连；未画出的空隙可能包含其他调度或处理阶段，不能直接把两项相加后认定解释了全部延迟。
+
+<Slide id="llm-observability-11" steps={['先找到 Queue wait：8.1 秒发生在 Prefill 之前，不能通过只加速模型运算消除。','再看 Prefill：6.0 秒是输入计算阶段，首 token 在约 15.7 秒出现。','最后看 Decode 与 Stream：后续输出是另一段时间，流畅程度需要另外测量。']} minute="讲义把一个流式请求按阶段展开，配合本场“从现象定位阶段，再检查相邻层指标”的方法。这里只用图中时间解释诊断过程，不把它当成硬件基准。" />
+
+## 用一个可以算清的模型练习
+
+设排队时间为 $Q$，Prefill 为 $P$，网络与其他固定开销为 $O$，输出 token 数为 $N$，后续每 token 平均时间为 $D$：
+
+$$TTFT=Q+P+O,\qquad T_{total}=TTFT+(N-1)D$$
+
+为什么是 $N-1$？因为第一个输出已经在 TTFT 的终点产生。这里假设后续步骤耗时固定，真实的连续批处理、网络 chunk 与推测解码会让情况更复杂。
+
+<Demo type="latency" client:visible={{rootMargin: "300px"}} />
+
+先将队列调到很大，保持其他参数不变；再把 Prefill 缩短一半。如果 TTFT 改善很有限，你看到的是“优化了非主要部分”的结果。接着把输出长度调长，观察总时间如何增长，而 TTFT 保持不变。这让你区分两个不同目标。
+
+## 平均速度不能说明全部体验
+
+<Term id="tpot" /> 描述平均输出时间；<Term id="itl" /> 关注相邻 token 间隔。平均 40 ms 的输出，可能每一步都接近 40 ms，也可能大部分很快、中间停顿很久。用户对后一种更敏感。
+
+需要查看分布和分位数。p95 表示约 95% 样本不超过该值，不是“最慢 5% 的平均值”。跨实例汇总时不能直接平均各实例的 p95，应使用适合聚合的直方图等方法。
+
+## 怎么采到可信的客户端数据
+
+流式接口经常用 <Term id="sse" label="SSE" />（Server-Sent Events，服务器发送事件）。一个事件可能只有角色信息，也可能包含多个 token。客户端脚本应忽略空内容事件，把首次非空文本到达标记为“首内容延迟”；这与精确模型首 token 时间有偏差，报告时要保留这个名称。
+
+实验包的 `measure_stream.py` 会保存请求开始、首内容、结束及每个内容 chunk 的时间。它不会把 chunk 间隔伪装成 ITL；精确 token 指标应从支持相应观测的引擎获取。
+
+## 改一个变量，再解释现象
+
+第一组固定输出长度，增加输入长度；第二组固定输入，增加并发；第三组固定输入和并发，增加输出长度。每组先热身、重复测量，记录中位数和 p95，并保存引擎指标。
+
+如果增加并发主要推高排队，先研究调度和容量；如果单请求 Prefill 随输入明显增长，继续看输入计算与缓存；如果只有长输出变差，则需要研究 Decode、KV 读取与同批请求的影响。不要一开始就随机调整所有参数。

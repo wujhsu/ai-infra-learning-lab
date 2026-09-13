@@ -1,0 +1,52 @@
+---
+title: "实验 09 · 观察 Claim 分配与设备准备"
+description: "使用实际安装的驱动类别，跟踪 DRA 的不同阶段。"
+order: 9
+module: 2
+minutes: 25
+prerequisites: ["17-dra"]
+terms: ["dra", "claim", "numa", "resourceslice", "pod", "deviceclass"]
+sources: ["dra", "dra-features"]
+sessions: []
+question: "应该先删除消费者还是直接假设 Claim 删除就回收设备？"
+answer: "按资源使用关系处理：结束消费者并观察节点解除准备，再删除不再需要的 Claim，确认状态与资源回收。具体保护行为依赖 API 与驱动实现。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+需要 Kubernetes 1.37 与支持相应设备的 <Term id="dra" label="DRA" /> 驱动。驱动安装涉及平台条件，先选择并固定适用于目标硬件的官方发行版；本教材不把某厂商的全部高级功能当作核心 DRA 默认能力。
+
+## 查真实库存与类别
+
+```bash
+kubectl get deviceclasses
+kubectl get resourceslices
+kubectl explain resourceclaim.spec.devices.requests --api-version=resource.k8s.io/v1
+```
+
+下载包的 `dra.yaml` 中 `example-gpu-class` 必须替换为实际类别。检查 <Term id="resourceslice" label="ResourceSlice" /> 的设备属性与可达节点，并记录驱动版本、chart 和 feature gates。
+
+## 分阶段提交与观察
+
+```bash
+kubectl apply --dry-run=server -f labs/kubernetes/dra.yaml
+kubectl apply -f labs/kubernetes/dra.yaml
+kubectl get resourceclaims -n inference-lab -o yaml
+kubectl describe pod dra-consumer -n inference-lab
+kubectl logs dra-consumer -n inference-lab
+```
+
+这个消费者只运行 `nvidia-smi`，验证设备暴露，不运行模型。`ResourceClaim` 的分配结果、<Term id="pod" label="Pod" /> 绑定和设备准备是独立检查点。
+
+## 加入一个失败对照
+
+使用测试专用声明请求不存在的 <Term id="deviceclass" label="DeviceClass" /> 或不满足条件的设备，预测失败会停在哪个阶段。不要更改共享集群的真实设备健康状态。保存事件和结果后删除失败对照。
+
+高级 <Term id="numa" label="NUMA" /> 匹配单独进行，只有目标版本和驱动属性均支持时再加入。会议中的 1.38 计划字段不进入本实验可执行路径。
+
+## 验收与回收
+
+提交真实类别、库存片段、Claim 分配、Pod 事件与设备可见输出。删除 Pod，再删除 Claim，观察驱动解除准备和资源回收。未验证回收就不能标记生命周期实验完成。

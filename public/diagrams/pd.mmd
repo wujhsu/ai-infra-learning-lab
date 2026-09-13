@@ -1,0 +1,11 @@
+sequenceDiagram
+ participant C as 客户端
+ participant R as 路由
+ participant P as Prefill 实例
+ participant D as Decode 实例
+ C->>R: 请求与上下文
+ R->>P: 输入计算
+ P->>D: KV 交接（数据与布局）
+ D-->>R: 交接成功并继续生成
+ R-->>C: 流式输出
+ Note over P,D: 失败、取消与资源释放必须协调

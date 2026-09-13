@@ -1,0 +1,79 @@
+---
+title: "实验 12 · 验证回滚与分析边界"
+description: "用可控错误服务检查发布控制，再应用到推理服务路由。"
+order: 12
+module: 3
+minutes: 25
+prerequisites: ["22-canary", "23-agent-repair"]
+terms: ["canary", "gitops", "slo", "pod", "lws"]
+sources: ["rollouts", "rollouts-release"]
+sessions: []
+question: "fixture 健康接口正常但业务接口 500，验证了什么？"
+answer: "验证探针通过不代表业务成功，发布分析必须观察真实业务路径与样本，不能只依赖 Pod Ready。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+需要测试 Kubernetes 集群和 Argo Rollouts 1.10.0。第一阶段使用实验包的 CPU HTTP 服务，只验证发布控制，不模拟模型性能。
+
+## 准备可控坏版本
+
+`labs/rollouts/app.py` 的 `/health` 返回健康；普通请求在 `FAIL=true` 时返回 500，或由 `LATENCY_SECONDS` 注入延迟。这个设计能证明“健康接口通过”不代表业务路径正常。
+
+```bash
+docker build -t inference-rollout-fixture:lab1 labs/rollouts
+```
+
+将镜像导入测试集群或推送到你有权限的 registry，记录 digest。不要把本机镜像标签当作所有节点都能拉取的地址。
+
+## 建立稳定与候选服务
+
+使用实验包的生成器创建五副本 Rollout、stable/canary Service 和 AnalysisTemplate。先验证基础 Rollout 的暂停、继续和终止；再增加支持的路由集成。没有路由权重控制时，只把副本比例作为近似实验，不能声称精确流量百分比。
+
+```bash
+# IMAGE 是所有节点可以拉取的 fixture 镜像，建议使用 registry/name@sha256:…
+python3 labs/rollouts/render.py --image "$IMAGE" > rollout.generated.json
+kubectl create namespace inference-rollout-lab --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply --dry-run=server -f rollout.generated.json
+kubectl apply -f rollout.generated.json
+kubectl -n inference-rollout-lab get rollout,pods
+kubectl -n inference-rollout-lab port-forward svc/fixture-stable 8000:8000
+```
+
+首次创建会建立稳定版本，<Term id="canary" label="Canary" /> 步骤在后续模板变更时执行。生成器中的 Analysis Job 只请求候选 Service 的真实业务路径，共 10 个请求，至少 9 个成功才通过；请求异常按失败处理，Job 总时限 60 秒。它用于验证控制边界，不是生产级统计显著性检验。
+
+在另一个终端触发坏版本：
+
+```bash
+kubectl -n inference-rollout-lab patch rollout fixture --type=merge -p '{"spec":{"template":{"spec":{"containers":[{"name":"app","image":"REPLACE_WITH_YOUR_FIXTURE_IMAGE","ports":[{"containerPort":8000}],"env":[{"name":"FAIL","value":"true"}],"readinessProbe":{"httpGet":{"path":"/health","port":8000}}}]}}}}'
+kubectl -n inference-rollout-lab get rollout,analysisrun,jobs
+```
+
+补丁中的镜像需替换为你已验证可拉取的原 fixture 地址；否则测到的是镜像拉取失败。该补丁整体替换 containers 数组，用于一次性测试 namespace。预期健康探针通过，但业务分析失败，Rollout 中止候选推进并恢复稳定副本；必须以实际 AnalysisRun 状态和 stable 请求验证这一结论。
+
+生产中的指标分析还需加入业务错误率、足够样本和一致时间窗。无数据、查询失败或样本不足必须进入明确的失败/不确定路径。
+
+## 四个故障检查
+
+候选版本返回错误；监控后端不可用；stable/canary 窗口错开；Agent 结果结构不合法。每项记录实际 AnalysisRun 状态，验证不会因空结果自动继续。
+
+Agent 适配器接收有限决策结构，修复只输出分支与 PR 草稿，经过测试与评审才进入下一次发布。两个 Agent 的共识不替代门禁条件。实验包 `validate_decision.py` 对 action、reason、evidence 和 patch_ref 做严格校验：
+
+```bash
+printf '%s' '{"action":"hold","reason":"样本不足","evidence":["仅有 2 次请求"],"patch_ref":""}' | python3 labs/rollouts/validate_decision.py
+```
+
+合法结果仍是建议，不会执行集群变更。用缺少 evidence、额外字段和 action=deploy 的输入验证退出码非零。
+
+## 应用到推理工作组
+
+稳定和候选各有独立模型服务/<Term id="lws" label="LWS" /> 组，在路由层切换新流量。不要让 Rollouts 和 LWS 同时控制同一份 <Term id="pod" label="Pod" /> 模板期望。记录在途流式请求的 drain 行为。
+
+## 验收与清理
+
+提交实际流量比例、分析结果、错误率、回滚后请求和 Agent 负例结果。保存所有事件后删除实验 Rollout、分析对象和 fixture 服务；保留 controller 是否删除按测试集群共享范围决定。
+
+完成取证后可运行 `kubectl delete namespace inference-rollout-lab` 删除独立实验资源。

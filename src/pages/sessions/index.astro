@@ -1,0 +1,4 @@
+---
+import Base from '../../layouts/Base.astro';import sessions from '../../data/sessions.json';import slides from '../../data/slides.json';import {asset} from '../../data/curriculum';
+---
+<Base title="会议资料" active="sessions/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">12 份记录 · 9 份讲义 · 214 页索引</span><h1>回到知识的现场</h1><p>原始材料作为证据入口。正文只选择能解释问题的页面，完整妙记与个人元数据不在公开站发布。</p></header><div class="resource-grid">{sessions.map(s=><a class="resource-card" href={asset(`sessions/${s.id}/`)}><small>{s.date} · {s.time}</small><h2>{s.title}</h2><p>{s.hasSlides?`${slides.filter(p=>p.session===s.id).length} 页讲义索引`:'本地妙记整理 · 无公开讲义'} · 查看解读与课程关联 →</p></a>)}</div></div></Base>

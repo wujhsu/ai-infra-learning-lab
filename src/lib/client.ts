@@ -1,0 +1,29 @@
+import {emptyEntry,readStore,saveStore} from './storage';
+declare global{interface Window{LEARNING_GLOSSARY:any[];LEARNING_BASE:string;}}
+const $=<T extends HTMLElement=HTMLElement>(s:string)=>document.querySelector<T>(s);
+let toastTimer:ReturnType<typeof setTimeout>;
+export function toast(text:string){const el=$('#toast')!;el.textContent=text;el.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,4000);}
+const save=()=>{if(!saveStore(state))toast('浏览器未允许保存；本次学习记录不会持久保存，请导出备份。');};let state=readStore();
+const termDialog=$<HTMLDialogElement>('#term-dialog')!;
+for(const a of document.querySelectorAll<HTMLAnchorElement>('[data-foundation]'))a.addEventListener('click',e=>{e.preventDefault();$<HTMLDialogElement>('#foundation-dialog')!.showModal();});
+function showTerm(id:string){const t=window.LEARNING_GLOSSARY.find(t=>t.id===id);if(!t)return;for(const [key,value]of Object.entries({title:t.name,full:t.full,definition:t.definition,example:t.example,confused:'容易混淆：'+t.confused})){const el=$(`[data-term-${key}]`);if(el)el.textContent=String(value);}const link=$<HTMLAnchorElement>('[data-term-link]')!;link.href=window.LEARNING_BASE+'learn/'+t.lesson+'/';termDialog.showModal();}
+for(const button of document.querySelectorAll<HTMLElement>('[data-term]'))button.addEventListener('click',()=>showTerm(button.dataset.term!));
+const settings=$<HTMLDialogElement>('#settings-dialog')!;$('[data-settings]')?.addEventListener('click',()=>settings.showModal());
+for(const select of document.querySelectorAll<HTMLSelectElement>('[data-pref]')){const pref=select.dataset.pref as 'theme'|'size'|'line';select.value=String(state.settings[pref]);select.addEventListener('change',()=>{if(pref==='theme')state.settings.theme=select.value;else state.settings[pref]=Number(select.value);document.documentElement.dataset.theme=state.settings.theme;document.documentElement.style.setProperty('--reading-size',state.settings.size+'px');document.documentElement.style.setProperty('--reading-line',String(state.settings.line));const fresh=readStore();fresh.settings=state.settings;if(!saveStore(fresh))toast('设置保存失败');});}
+$('[data-focus]')?.addEventListener('click',()=>{document.body.classList.toggle('focus-mode');settings.close();});
+if(matchMedia('(min-width: 761px)').matches)document.querySelector('.reading-aside details')?.setAttribute('open','');
+const page=$<HTMLElement>('[data-record]');if(page){const id=page.dataset.record!;state.records[id]??=emptyEntry();state.last=id;save();const r=state.records[id];const status=$('[data-save-status]');
+ for(const checkbox of document.querySelectorAll<HTMLInputElement>('[data-record-field]')){const f=checkbox.dataset.recordField as 'read'|'understood'|'lab'|'bookmark'|'review';checkbox.checked=r[f];checkbox.addEventListener('change',()=>{r[f]=checkbox.checked;r.updated=new Date().toISOString();save();});}
+ const note=$<HTMLTextAreaElement>('[data-note]');if(note){note.value=r.note;note.addEventListener('input',()=>{r.note=note.value;r.updated=new Date().toISOString();if(saveStore(state)){if(status)status.textContent='已保存在此浏览器';}else{if(status)status.textContent='保存失败，请复制或导出笔记';}});}
+ const resume=$<HTMLAnchorElement>('[data-resume]');if(r.anchor&&!location.hash&&document.getElementById(r.anchor)&&resume){resume.hidden=false;resume.href='#'+encodeURIComponent(r.anchor);}
+ const observer=new IntersectionObserver(entries=>{const entry=entries.find(e=>e.isIntersecting);if(entry){r.anchor=entry.target.id;saveStore(state);}},{rootMargin:'-10% 0px -65% 0px'});document.querySelectorAll('.prose h2[id]').forEach(h=>observer.observe(h));
+}
+const continueLink=$<HTMLAnchorElement>('[data-continue]');if(continueLink&&state.last){continueLink.href=window.LEARNING_BASE+state.last+'/';const target=document.querySelector<HTMLElement>(`[data-course="${state.last}"]`);if(target)$('[data-continue-title]')!.textContent=target.dataset.title!;}
+for(const node of document.querySelectorAll<HTMLElement>('[data-course]')){const r=state.records[node.dataset.course!];if(r?.read)node.classList.add('is-read');}
+const progress=$('[data-completed]');if(progress)progress.textContent=String(Object.entries(state.records).filter(([id,r])=>id.startsWith('learn/')&&r.read).length);
+const imageDialog=$<HTMLDialogElement>('#image-dialog')!;let scale=1;const img=$<HTMLImageElement>('[data-large-image]')!;
+for(const a of document.querySelectorAll<HTMLAnchorElement>('[data-zoom]'))a.addEventListener('click',e=>{e.preventDefault();scale=1;img.style.width='100%';img.src=a.href;img.alt=a.dataset.caption||'讲义原图';$('[data-image-caption]')!.textContent=img.alt;$<HTMLAnchorElement>('[data-original]')!.href=a.href;imageDialog.showModal();});
+for(const b of document.querySelectorAll<HTMLButtonElement>('[data-image-scale]'))b.addEventListener('click',()=>{scale=Math.max(.5,Math.min(3,scale+(b.dataset.imageScale==='+'?.25:-.25)));img.style.width=scale*100+'%';});
+for(const study of document.querySelectorAll<HTMLElement>('[data-slide-study]')){const buttons=study.querySelectorAll<HTMLButtonElement>('[data-slide-step]');buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.setAttribute('aria-pressed',String(x===b)));const focus=study.querySelector<HTMLElement>('.slide-focus')!;const box=b.dataset.region?.split(',').map(Number);focus.hidden=!box;if(box){const [left,top,width,height]=box;Object.assign(focus.style,{left:left+'%',top:top+'%',width:width+'%',height:height+'%'});}}));}
+for(const pre of document.querySelectorAll('pre')){const b=document.createElement('button');b.className='copy-code';b.textContent='复制';b.type='button';b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(pre.querySelector('code')?.textContent||'');toast('已复制代码');}catch{toast('复制不可用，请选中代码复制。');}});pre.append(b);}
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();location.href=window.LEARNING_BASE+'search/';}});

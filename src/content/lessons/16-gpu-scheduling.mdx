@@ -1,0 +1,62 @@
+---
+title: "Kubernetes 怎样给 Pod 找到 GPU？"
+description: "从整数资源请求走到设备健康、共享和拓扑约束。"
+order: 16
+module: 5
+minutes: 25
+prerequisites: ["15-nccl"]
+terms: ["gpu", "pod", "numa", "dra", "lws"]
+sources: ["device-plugin", "dra"]
+sessions: ["kubernetes-dra"]
+question: "Pod 请求一个 GPU 资源单位，就能保证独占整张物理 GPU 吗？"
+answer: "不能。资源单位由设备插件或驱动配置定义，可能对应完整 GPU、MIG 实例或共享单位。必须核对实际资源语义和隔离能力。"
+lab: "08-kubernetes"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+写下 `nvidia.com/gpu: 1`，看起来像申请一个 CPU。区别在于 <Term id="gpu" label="GPU" /> 是具体设备：不同型号有不同容量与能力，设备可能故障，也可能通过硬件或软件方式共享。
+
+## 传统扩展资源如何表达需求
+
+Device Plugin 向 kubelet 报告设备并参与分配，使节点能够暴露类似 `nvidia.com/gpu` 的扩展资源。调度器首先基于节点可分配资源等条件选择节点，具体设备的使用还涉及节点侧机制。
+
+```yaml
+# 典型 device-plugin 路径中的容器片段
+resources:
+  limits:
+    nvidia.com/gpu: 1
+```
+
+这个整数表达“需要一个资源单位”，但资源单位是否代表完整 GPU、某种切分或共享配置，要看驱动的资源定义。不能看到 1 就推断拥有一张物理卡的全部独占能力。
+
+## 共享有不同语义
+
+MIG（Multi-Instance GPU）在支持的硬件上创建隔离的设备实例；time-slicing 让工作轮流共享 GPU 时间；MPS 提供多进程执行相关机制。它们在内存、故障隔离和性能干扰上并不等价。没有具体配置时，不宣称共享后每个租户获得稳定同等性能。
+
+## 节点空闲不代表拓扑合适
+
+<Term id="numa" /> 描述不同内存和设备访问路径的代价差异。一个模型需要 GPU 与 NIC 协作，如果它们分布在远端拓扑，数据可能经过额外路径。任务能被调度和任务被高效调度是不同的标准。
+
+<Diagram id="topology" caption="GPU、NIC 与 CPU 插槽的位置影响通信路径；拓扑约束需要与实际驱动属性对应。" />
+
+## 工作组需要一起考虑
+
+分布式服务可能需要同时获得多张 GPU。只保证每个 <Term id="pod" label="Pod" /> 分别有资源，可能出现部分成员启动、其他成员长期排队。此时资源被占用却没有完整模型可以服务。
+
+资源预留、组调度与启动编排分别解决不同阶段的问题。<Term id="lws" label="LWS" /> 管理组生命周期，不应被当作所有集群组调度策略的替代品。
+
+## 从“多少个”走到“是什么”
+
+<Slide id="kubernetes-dra-9" />
+
+<Term id="dra" label="DRA" /> 允许用结构化属性和声明表达更多需求，随后还需要分配、准备和状态管理。它并不让复杂硬件差异消失，而是把这些差异放在可以被选择和观测的接口上。
+
+## 一个部署前的检查清单
+
+列出模型需要的设备数量、单设备显存、共享限制、网络要求和失败影响。再查看集群实际暴露的资源名、驱动版本、健康与节点标签。资源名必须从集群查询，不能凭厂商名称猜测。
+
+实验里先走传统资源路径完成可运行基线，再使用 DRA 实验对照。这样可以区分“应用本身跑不通”和“新的设备分配路径有问题”。

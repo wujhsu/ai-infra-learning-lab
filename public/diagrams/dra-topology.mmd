@@ -1,0 +1,7 @@
+flowchart LR
+ G[GPU driver 属性] --> N[统一 NUMA 语义]
+ I[NIC driver 属性] --> N
+ N --> M[Claim 共置约束]
+ M --> S[调度与分配]
+ S --> P[驱动准备]
+ P --> W[工作负载]

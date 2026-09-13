@@ -1,0 +1,4 @@
+---
+import {getCollection} from 'astro:content';import Base from '../../layouts/Base.astro';import {asset} from '../../data/curriculum';const topics=(await getCollection('topics')).sort((a,b)=>a.data.order-b.data.order);
+---
+<Base title="深入专题" active="topics/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">在主线之外，继续追问</span><h1>把感兴趣的机制讲透</h1><p>前五篇深入实现与工程边界，最后两篇帮助理解大会全景与基础设施迁移。每篇都标出前置知识。</p></header><div class="resource-grid">{topics.map((e,i)=><a class="resource-card" href={asset(`topics/${e.id}/`)}><small>{i<5?'进阶专题':'科普与背景'} · {e.data.minutes} 分钟，含思考</small><h2>{e.data.title}</h2><p>{e.data.description}</p></a>)}</div></div></Base>

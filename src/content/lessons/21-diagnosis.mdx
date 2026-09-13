@@ -1,0 +1,64 @@
+---
+title: "把三个性能故障查清楚"
+description: "从首 token 上升、忙而低产出、KV 饱和三类现象练习诊断。"
+order: 21
+module: 6
+minutes: 25
+prerequisites: ["20-correlation"]
+terms: ["ttft", "kv-cache", "throughput", "trace", "prefill", "gpu", "tensor", "tp", "sm"]
+sources: ["vllm-metrics", "prometheus", "nccl"]
+sessions: ["llm-observability"]
+question: "请求 QPS 没变，为什么负载仍可能变重？"
+answer: "输入/输出长度、并发、到达突发、模型与缓存命中分布都可能改变每请求工作量。必须固定或记录这些维度，QPS 只是其中一项。"
+lab: "11-observability"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+排障的目标不是尽快猜中一个参数，而是逐步排除错误解释。下面三个案例都先给现象，再给需要补充的证据。不要跳过反证，否则很容易把巧合当根因。
+
+## 案例一：请求量没变，首 token 变慢
+
+“请求量没变”没有说明输入长度是否变了。先比较输入 token 分布、并发、输出长度和到达节奏。相同平均 QPS 可能具有不同突发程度。
+
+<Slide id="llm-observability-12" />
+
+若 queue wait 上升而单请求 <Term id="prefill" label="Prefill" /> 没变，检查容量、调度和突发。若 Prefill 随长输入增加，检查缓存复用和计算预算。若只有客户端首内容变慢，引擎指标稳定，检查网关缓冲、网络与客户端。
+
+反证很重要：把同一请求单独发到空闲实例，如果仍慢，纯排队假设就不充分。保留冷启动与稳定状态的区别。
+
+## 案例二：GPU 很忙，token 产出却低
+
+<Term id="gpu" label="GPU" /> utilization 描述忙碌采样，不等于有效模型 FLOPs 利用率。通信等待、内存访问、低效率 kernel 或不合适的批次都可能与高忙碌同时出现。
+
+<Slide id="llm-observability-13" />
+
+先确认吞吐口径和负载是否可比，再检查 <Term id="sm" label="SM" />/<Term id="tensor" label="Tensor" /> 活动、内存带宽、通信与执行时间线。改变 <Term id="tp" label="TP" /> 大小后若通信占比显著增加，不能只看单卡显存下降就判定优化成功。
+
+反证：如果关闭压测后仍有高占用，检查是否有其他进程；如果设备指标正常但业务吞吐下降，检查应用端重试、限流和输出计数。
+
+## 案例三：KV 饱和引发连锁反应
+
+更多活跃长序列占用缓存，调度器可能排队或抢占，随后 <Term id="ttft" label="TTFT" /> 和输出间隔变差。显存已被预分配时，设备总占用可能几乎不变。
+
+检查引擎 KV 块使用、等待队列、抢占次数和长度分布。短期可限制并发或长度，但这改变了服务能力；长期可能需要更好的缓存策略、路由和容量设计。
+
+## 三个案例共用的记录表
+
+| 字段 | 应该写什么 |
+|---|---|
+| 症状 | 哪个用户指标、哪个窗口、哪些请求 |
+| 假设 | 例如排队、长输入、网络退化；一次一个 |
+| 验证 | 需要哪条 trace、哪个指标或对照实验 |
+| 反证 | 出现什么结果就放弃该假设 |
+| 动作 | 改哪个参数，预期改变哪一阶段 |
+| 回归 | 吞吐、延迟、错误与资源是否一起检查 |
+
+## 练习：不要把调优写成随机搜索
+
+用实验包的负载脚本制造长输入与并发变化，先写预期，再运行。另用受控错误版本验证发布回滚，不在未经授权的共享生产环境做故障注入。
+
+GPU 网络降级实验需要专用测试环境和明确恢复步骤。若无法运行，保存计划与未验证状态；不要拿一张模拟曲线充当结果。

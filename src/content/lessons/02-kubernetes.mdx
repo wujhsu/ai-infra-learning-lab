@@ -1,0 +1,70 @@
+---
+title: "谁在运行服务，谁在管理服务？"
+description: "从进程和容器出发，理解 Pod、Service、控制器与调度器。"
+order: 2
+module: 0
+minutes: 25
+prerequisites: ["01-request"]
+terms: ["pod", "controller", "lws", "gpu", "dra"]
+sources: ["k8s", "lws-api"]
+sessions: []
+question: "Deployment、Service、调度器分别负责什么？"
+answer: "Deployment 维持声明的副本与更新行为；Service 提供稳定访问与后端选择；调度器为尚未调度的 Pod 选择节点。它们都不直接计算模型 token。"
+lab: "01-serving"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+先想一个普通 Python 服务：操作系统启动进程，进程监听端口，退出后就停止提供服务。把它放进容器，主要改变的是运行环境和资源边界；并没有自动解决多机调度、故障恢复和稳定访问。
+
+## 进程、容器与 Pod 是三层概念
+
+**进程**是正在运行的程序。**容器**利用命名空间隔离视图、通过 cgroups 约束资源，并用镜像提供文件系统。它通常共享宿主机内核，不是完整虚拟机。<Term id="pod" /> 是 Kubernetes 调度与生命周期管理的基本单元，可以包含多个协作容器。
+
+镜像像可分发的运行环境，容器是它的一次运行。Pod 中的容器共享网络命名空间，所以可以通过 localhost 通信；不同 Pod 通常拥有不同 IP。不要把 Pod IP 当成永久地址，因为 Pod 会被替换。
+
+## 声明式系统如何工作
+
+你提交一个 Deployment，声明“需要两个服务副本”。API Server 接收并保存对象。控制器观察现状，创建需要的 Pod。调度器为未调度 Pod 找节点，节点上的 kubelet 再协调容器运行时启动容器。
+
+<Diagram id="reconcile" caption="期望状态与实际状态不断对照；调度决定落点，kubelet 负责节点执行。" />
+
+<Term id="controller" /> 不会保证所有故障都能自动修好。如果镜像地址写错，每次创建都会继续失败。它擅长保持声明，而声明本身仍需要正确。
+
+## Running、Ready 和健康不能混为一谈
+
+Running 是 Pod 生命周期阶段，通常表示已绑定节点且容器已创建，至少有容器运行、启动或重启。Ready 是能否接流量的条件。分布式模型还有更高层的不变量：所有 rank 是否到齐？通信是否通过？每个节点的模型版本是否一致？
+
+探针也有不同职责：startupProbe 给慢启动留时间，readinessProbe 控制就绪，livenessProbe 处理进程失活。把昂贵且容易抖动的模型检查放进存活探针，可能触发无意义重启。
+
+```yaml
+# 配置片段：需放在一个 container 下，不是完整 Deployment。
+ports:
+  - containerPort: 8000
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  periodSeconds: 10
+startupProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  periodSeconds: 10
+  failureThreshold: 60
+```
+
+这里 startupProbe 最多提供约 600 秒的探测窗口，具体时序还受初始延迟和请求超时影响。这是教学参数，不应照搬到所有模型。`/health` 的含义也由应用实现决定。
+
+## Service 为什么有用
+
+Service 为一组 Pod 提供稳定访问抽象，通常通过标签选择后端。它并不自动理解哪个模型副本缓存了某个前缀，也不会替你实现所有 LLM 调度策略。基础网络负载均衡与缓存感知路由是不同问题。
+
+观察时按层分开：`kubectl get pods` 看阶段，`kubectl describe pod` 看事件，容器日志看进程失败，Service 和 EndpointSlice 看后端选择。遇到故障，一次只验证一个假设。
+
+## 将它映射到推理系统
+
+一个模型副本可能需要多个 Pod。单个 Deployment 的副本数不天然表达 leader/worker 关系；这正是后面 <Term id="lws" label="LWS" /> 的用途。设备也不只是“请求 8 个 CPU”，还会涉及 <Term id="gpu" label="GPU" /> 类型、健康和拓扑；后面用 <Term id="dra" label="DRA" /> 继续补全地图。

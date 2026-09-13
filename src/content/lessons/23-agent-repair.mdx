@@ -1,0 +1,62 @@
+---
+title: "Agent 能参与修复到哪一步？"
+description: "把模型的诊断能力放进有证据、可测试、可回滚的工程闭环。"
+order: 23
+module: 7
+minutes: 25
+prerequisites: ["22-canary"]
+terms: ["gitops", "canary", "trace"]
+sources: ["rollouts", "otel"]
+sessions: ["self-healing-rollouts"]
+question: "两个 Agent 都说新版本正常，为什么仍不能自动视为充分证据？"
+answer: "它们可能共享同一错误假设或缺失数据。需要确定性的样本要求、时间窗口、指标规则、输出校验和测试；模型共识不能替代系统证据。"
+lab: "12-rollouts"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+Agent 可以同时读取日志、指标和配置，提出故障解释或生成修改。但“写出了看似合理的原因”和“系统可以安全推进发布”之间，仍有一段需要工程验证的距离。
+
+## 会议案例的闭环
+
+收集器分别读取 stable 与 canary 数据，分析 Agent 比较异常，评分 Agent 检查结论，再由发布系统消费一个明确结果。可修复的问题生成 PR，复杂问题留下 issue 或人工处理入口。
+
+<Slide id="self-healing-rollouts-20" minute="现场演示将并行数据收集、分析和评分接到 Argo Rollouts 的分析插件。发生错误后先回滚，再让修复进入代码评审与 CI。" />
+
+评分 Agent 提供额外检查，但两个模型同意并不等于事实正确。它们可能共享同样不完整的上下文、误读同一份日志，甚至被相同的外部文本影响。
+
+## 先定义确定性的输出契约
+
+分析结果应包含状态、证据引用、置信说明、建议动作和错误信息。发布门禁消费有限状态，而不是自由文本里出现“看起来不错”就继续。超时、解析失败、证据不足应有明确分支。
+
+```json
+{
+  "decision": "inconclusive",
+  "evidence": ["metrics-window-2026-09-13T10:00Z"],
+  "reason": "canary 样本不足，无法比较尾延迟",
+  "proposed_action": "暂停放量并补充采样"
+}
+```
+
+这是教材自定义的分析协议示例，不是 Argo Rollouts 原生字段。适配器需要显式映射到发布系统支持的结果，并验证输出结构。
+
+## 给工具设置具体边界
+
+读取日志和指标与写集群配置分开。修复工作在分支中完成，保留原始证据、diff、测试和失败记录。<Term id="gitops" /> 控制器依然从审核后的声明驱动部署。
+
+外部日志和 issue 内容属于被分析的数据，不能变成给 Agent 的高优先级指令。密钥不进入日志和模型上下文；工具权限只覆盖实验所需资源。
+
+## 四个必须测试的负例
+
+监控后端不可用；stable/canary 时间窗口不一致；分析与评分结论相反；模型提出的修改通过语法检查却破坏行为。每个负例都应阻止未经验证的推进，而不是依赖模型临场判断。
+
+模型版本与提示词也影响结果，需要与代码一起记录。重复相同证据得到不同建议时，应观察不确定性，而不是只保留最符合预期的一次。
+
+## 什么叫完成了修复
+
+修复不是生成一个 PR 就结束。它需要能复现的问题、解释机制的修改、能失败再通过的测试、重新发布的结果，以及确认没有新退化的观察窗口。
+
+综合实验保留人工评审边界，同时验证自动回滚不依赖 Agent 自由文本。这样即使模型服务不可用，已有发布控制仍能按明确规则运行。

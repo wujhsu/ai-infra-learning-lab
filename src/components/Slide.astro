@@ -1,0 +1,17 @@
+---
+import slides from '../data/slides.json';
+import sessions from '../data/sessions.json';
+import {asset} from '../data/curriculum';
+const {id,steps=[],minute='',time=''}=Astro.props;
+const s=slides.find(x=>x.id===id);if(!s?.image)throw new Error(`Missing slide ${id}`);
+const regions:Record<string,number[][]>={'llm-observability-11':[[20,40,22,7],[41,48,18,14],[56,64,25,15]],'advanced-nccl-24':[[21,28,66,13],[21,48,55,22],[28,60,55,22]]};
+const session=sessions.find(x=>x.id===s.session)!;
+---
+<figure class="slide-study" data-slide-study>
+ <div class="slide-title"><span class="eyebrow">讲义证据</span><span>{session.title} · 第 {s.page} 页</span></div>
+ <a class="slide-image" href={asset(s.highres!)} data-zoom data-caption={`${session.title} · 第 ${s.page} 页`}><img src={asset(s.image)} alt={s.description||s.title} width="1200" height="675" loading="lazy"/><span class="zoom-label">放大原图 ↗</span><span class="slide-focus" hidden></span></a>
+ <figcaption>{s.description||s.title}</figcaption>
+ {steps.length>0&&<div class="slide-steps">{steps.map((step:string,i:number)=><button data-slide-step={i} data-region={regions[id]?.[i]?.join(',')} aria-pressed="false"><b>{String(i+1).padStart(2,'0')}</b><span>{step}</span></button>)}</div>}
+ {minute&&<details class="evidence"><summary>妙记补充{time&&` · 相对录音 ${time}`}</summary><p>{minute}</p><small>根据现场记录整理，非逐字引用；录音时间不等同 slide 切换时刻。</small></details>}
+ <details class="evidence"><summary>出处与使用边界</summary><p>{session.title}，{session.date}。原文件：{s.sourceFile}，第 {s.page} 页。讲义权利归原作者所有，本站用于配合学习解读。</p><a href={asset(`sessions/${s.session}/`)}>查看本场资料与逐页索引 →</a></details>
+</figure>

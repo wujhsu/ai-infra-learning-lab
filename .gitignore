@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+.sites-runtime/
+.DS_Store
+.env*
+!\.env.example
+
+__pycache__/
+*.pyc
+*.generated.json
+labs/**/experiment.env
+labs/**/environment.json
+labs/**/image-digests.json
+labs/**/model-cache/

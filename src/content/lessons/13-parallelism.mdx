@@ -1,0 +1,56 @@
+---
+title: "模型和请求，应该怎样分给多张卡？"
+description: "从复制、按层切分、按张量切分和专家路由四种方式理解并行。"
+order: 13
+module: 4
+minutes: 25
+prerequisites: ["12-disaggregation"]
+terms: ["dp", "tp", "pp", "ep", "nccl", "gpu", "allreduce"]
+sources: ["vllm-distributed", "nccl-api"]
+sessions: ["advanced-nccl"]
+question: "线性层按输出列切分和按输入行切分，为什么需要不同的通信？"
+answer: "按输出列切分得到不同输出分量，通常需要拼接或让后续层消费分片；按输入行切分得到同一输出的部分和，必须归约求和。"
+lab: "06-distributed"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+“用了 8 张 <Term id="gpu" label="GPU" />”没有说明它们怎么合作。可能是 8 份独立模型，也可能是一个模型切成多份。两者在显存、吞吐、延迟和故障影响上完全不同。
+
+## 先用两个问题选方向
+
+第一，单卡是否装得下目标模型与上下文预算？第二，目标是缩短单请求时间，还是接更多独立请求？如果单卡可运行且主要需要吞吐，多副本可能更直接；如果模型装不下，就需要考虑模型切分。
+
+| 方式 | 切分对象 | 主要通信 |
+|---|---|---|
+| DP / 推理副本 | 不同输入请求 | 推理副本通常不需要逐层同步；训练需要梯度同步 |
+| TP | 同一层的权重与张量计算 | 层内中间结果集合通信 |
+| PP | 不同层或阶段 | 阶段间传递激活 |
+| EP | MoE 专家 | token dispatch 与 combine |
+
+<Term id="dp" />、<Term id="tp" />、<Term id="pp" /> 和 <Term id="ep" /> 可以组合，但组合越多，布局与调度越复杂。
+
+## 一个线性层怎样做 TP
+
+设 `Y = XW`，W 形状为 `[4,6]`。将 W 按列分为两个 `[4,3]` 的部分，每卡计算自己的三个输出维度，之后按需要拼接。如果按行分，则 X 和 W 沿对应维度切分，得到的是部分和，需要相加。
+
+这个例子说明：通信类型由数学分解决定。不能先说“用 <Term id="allreduce" label="AllReduce" />”，再忽略结果究竟应该拼接还是求和。
+
+## PP 为什么有空泡
+
+一个请求先经过前面层，再到后面层。流水线需要足够的微批次填充，否则某些阶段在等输入或等下游。各阶段计算时间不均匀，也会由最慢阶段限制吞吐。单请求交互式生成与大批训练的流水线利用方式并不相同。
+
+## MoE 中 token 为什么会跨卡
+
+Mixture of Experts 用路由器为 token 选择专家。专家分布在不同设备，输入需要 dispatch 到目标专家，计算后再 combine。专家负载不均匀、跨节点发送量和小消息延迟都会影响性能。
+
+<Slide id="advanced-nccl-23" minute="NCCL 教程用 MoE 展示 dispatch、FC1、FC2、combine 的完整顺序，后续再讨论如何把通信和计算细化到 tile 并重叠。" />
+
+## 把拓扑带进决策
+
+频繁层内通信通常希望利用较快的设备互连。跨节点网络与节点内互连的延迟、带宽和可达性不同，因此“相同 GPU 数”不等于相同系统性能。
+
+实验时固定全局负载和模型配置，记录每卡峰值显存、实际通信、吞吐与尾延迟。GPU 数翻倍后速度不翻倍，可能来自通信、负载不均或模型本身并行度不足；这需要测量，而不是直接归因于某个框架。

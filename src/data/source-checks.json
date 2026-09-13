@@ -1,0 +1,232 @@
+[
+  {
+    "id": "cuda",
+    "url": "https://docs.nvidia.com/cuda/cuda-programming-guide/",
+    "resolved": "https://docs.nvidia.com/cuda/cuda-programming-guide/",
+    "status": 200,
+    "title": "CUDA Programming Guide &#8212; CUDA Programming Guide",
+    "checked": "2026-09-13T04:21:17.859Z"
+  },
+  {
+    "id": "attention",
+    "url": "https://arxiv.org/abs/1706.03762",
+    "resolved": "https://arxiv.org/abs/1706.03762",
+    "status": 200,
+    "title": "[1706.03762] Attention Is All You Need",
+    "checked": "2026-09-13T04:21:18.769Z"
+  },
+  {
+    "id": "k8s",
+    "url": "https://kubernetes.io/docs/concepts/overview/components/",
+    "resolved": "https://kubernetes.io/docs/concepts/overview/components/",
+    "status": 200,
+    "title": "Kubernetes Components | Kubernetes",
+    "checked": "2026-09-13T04:21:18.969Z"
+  },
+  {
+    "id": "compile",
+    "url": "https://docs.pytorch.org/docs/stable/torch.compiler.html",
+    "resolved": "https://docs.pytorch.org/docs/stable/torch.compiler.html",
+    "status": 200,
+    "title": "Redirecting&hellip;",
+    "checked": "2026-09-13T04:21:18.977Z"
+  },
+  {
+    "id": "pytorch",
+    "url": "https://github.com/pytorch/pytorch/releases/tag/v2.14.0",
+    "resolved": "https://github.com/pytorch/pytorch/releases/tag/v2.14.0",
+    "status": 200,
+    "title": "Release PyTorch 2.14.0 Release · pytorch/pytorch · GitHub",
+    "checked": "2026-09-13T04:21:19.592Z"
+  },
+  {
+    "id": "pagedattention",
+    "url": "https://arxiv.org/abs/2309.06180",
+    "resolved": "https://arxiv.org/abs/2309.06180",
+    "status": 200,
+    "title": "[2309.06180] Efficient Memory Management for Large Language Model Serving with PagedAttention",
+    "checked": "2026-09-13T04:21:19.894Z"
+  },
+  {
+    "id": "vllm-serving",
+    "url": "https://docs.vllm.ai/en/latest/serving/openai_compatible_server/",
+    "resolved": "https://docs.vllm.ai/en/latest/serving/openai_compatible_server/",
+    "status": 200,
+    "title": "Redirecting...",
+    "checked": "2026-09-13T04:21:20.460Z"
+  },
+  {
+    "id": "vllm-prefix",
+    "url": "https://docs.vllm.ai/en/latest/features/automatic_prefix_caching/",
+    "resolved": "https://docs.vllm.ai/en/latest/features/automatic_prefix_caching/",
+    "status": 200,
+    "title": "Automatic Prefix Caching - vLLM",
+    "checked": "2026-09-13T04:21:20.591Z"
+  },
+  {
+    "id": "vllm-metrics",
+    "url": "https://docs.vllm.ai/en/latest/usage/metrics/",
+    "resolved": "https://docs.vllm.ai/en/latest/usage/metrics/",
+    "status": 200,
+    "title": "Production Metrics - vLLM",
+    "checked": "2026-09-13T04:21:21.413Z"
+  },
+  {
+    "id": "vllm",
+    "url": "https://github.com/vllm-project/vllm/releases/tag/v0.29.0",
+    "resolved": "https://github.com/vllm-project/vllm/releases/tag/v0.29.0",
+    "status": 200,
+    "title": "Release v0.29.0 · vllm-project/vllm · GitHub",
+    "checked": "2026-09-13T04:21:21.529Z"
+  },
+  {
+    "id": "nccl",
+    "url": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/deviceapi.html",
+    "resolved": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/deviceapi.html",
+    "status": 200,
+    "title": "Device-Initiated Communication &mdash; NCCL 2.31.2 documentation",
+    "checked": "2026-09-13T04:21:21.676Z"
+  },
+  {
+    "id": "nccl-api",
+    "url": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html",
+    "resolved": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html",
+    "status": 200,
+    "title": "Collective Operations &mdash; NCCL 2.31.2 documentation",
+    "checked": "2026-09-13T04:21:21.903Z"
+  },
+  {
+    "id": "vllm-pd",
+    "url": "https://docs.vllm.ai/en/latest/features/disagg_prefill/",
+    "resolved": "https://docs.vllm.ai/en/latest/features/disagg_prefill/",
+    "status": 200,
+    "title": "Disaggregated Prefilling (experimental) - vLLM",
+    "checked": "2026-09-13T04:21:22.059Z"
+  },
+  {
+    "id": "vllm-distributed",
+    "url": "https://docs.vllm.ai/en/latest/serving/parallelism_scaling/",
+    "resolved": "https://docs.vllm.ai/en/latest/serving/parallelism_scaling/",
+    "status": 200,
+    "title": "Parallelism and Scaling - vLLM",
+    "checked": "2026-09-13T04:21:22.700Z"
+  },
+  {
+    "id": "device-plugin",
+    "url": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
+    "resolved": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
+    "status": 200,
+    "title": "Device Plugins | Kubernetes",
+    "checked": "2026-09-13T04:21:23.739Z"
+  },
+  {
+    "id": "lws",
+    "url": "https://github.com/kubernetes-sigs/lws/releases/tag/v0.10.0",
+    "resolved": "https://github.com/kubernetes-sigs/lws/releases/tag/v0.10.0",
+    "status": 200,
+    "title": "Release v0.10.0 · kubernetes-sigs/lws · GitHub",
+    "checked": "2026-09-13T04:21:25.280Z"
+  },
+  {
+    "id": "dra",
+    "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/how-dra-works/",
+    "resolved": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/how-dra-works/",
+    "status": 200,
+    "title": "How DRA Works | Kubernetes",
+    "checked": "2026-09-13T04:21:25.848Z"
+  },
+  {
+    "id": "lws-api",
+    "url": "https://lws.sigs.k8s.io/docs/reference/leaderworkerset.v1/",
+    "resolved": "https://lws.sigs.k8s.io/docs/reference/leaderworkerset.v1/",
+    "status": 200,
+    "title": "LeaderWorkerSet API | LWS",
+    "checked": "2026-09-13T04:21:26.223Z"
+  },
+  {
+    "id": "dra-features",
+    "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/dra-features/",
+    "resolved": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/dra-features/",
+    "status": 200,
+    "title": "DRA Features | Kubernetes",
+    "checked": "2026-09-13T04:21:26.656Z"
+  },
+  {
+    "id": "lws-preflight",
+    "url": "https://github.com/kubernetes-sigs/lws/pull/813",
+    "resolved": "https://github.com/kubernetes-sigs/lws/pull/813",
+    "status": 200,
+    "title": "docs(kep): draft fail-fast restart budget and init-phase DNS for LWS by panpan0000 · Pull Request #813 · kubernetes-sigs/lws · GitHub",
+    "checked": "2026-09-13T04:21:27.707Z"
+  },
+  {
+    "id": "rollouts",
+    "url": "https://argo-rollouts.readthedocs.io/en/stable/features/analysis/",
+    "resolved": "https://argo-rollouts.readthedocs.io/en/stable/features/analysis/",
+    "status": 200,
+    "title": "Overview - Argo Rollouts - Kubernetes Progressive Delivery Controller",
+    "checked": "2026-09-13T04:21:28.335Z"
+  },
+  {
+    "id": "prometheus",
+    "url": "https://prometheus.io/docs/practices/histograms/",
+    "resolved": "https://prometheus.io/docs/practices/histograms/",
+    "status": 200,
+    "title": "Histograms and summaries | Prometheus",
+    "checked": "2026-09-13T04:21:28.515Z"
+  },
+  {
+    "id": "otel-genai",
+    "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+    "resolved": "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+    "status": 200,
+    "title": "Moved: Generative AI semantic conventions | OpenTelemetry",
+    "checked": "2026-09-13T04:21:29.051Z"
+  },
+  {
+    "id": "rollouts-release",
+    "url": "https://github.com/argoproj/argo-rollouts/releases/tag/v1.10.0",
+    "resolved": "https://github.com/argoproj/argo-rollouts/releases/tag/v1.10.0",
+    "status": 200,
+    "title": "Release v1.10.0 · argoproj/argo-rollouts · GitHub",
+    "checked": "2026-09-13T04:21:29.441Z"
+  },
+  {
+    "id": "otel",
+    "url": "https://opentelemetry.io/docs/concepts/signals/",
+    "status": 0,
+    "error": "fetch failed"
+  },
+  {
+    "id": "optim",
+    "url": "https://docs.pytorch.org/docs/stable/optim.html",
+    "resolved": "https://docs.pytorch.org/docs/stable/optim.html",
+    "status": 200,
+    "title": "Redirecting&hellip;",
+    "checked": "2026-09-13T04:21:34.755Z"
+  },
+  {
+    "id": "openstack",
+    "url": "https://docs.openstack.org/install-guide/get-started-conceptual-architecture.html",
+    "resolved": "https://docs.openstack.org/install-guide/get-started-conceptual-architecture.html",
+    "status": 200,
+    "title": "Conceptual architecture &#8212; Installation Guide  documentation",
+    "checked": "2026-09-13T04:21:34.829Z"
+  },
+  {
+    "id": "accelerator",
+    "url": "https://docs.pytorch.org/docs/stable/accelerator.html",
+    "resolved": "https://docs.pytorch.org/docs/stable/accelerator.html",
+    "status": 200,
+    "title": "Redirecting&hellip;",
+    "checked": "2026-09-13T04:21:35.421Z"
+  },
+  {
+    "id": "schedule",
+    "url": "https://www.lfopensource.cn/kubecon-cloudnativecon-openinfra-summit-pytorch-conference-china/program/schedule/",
+    "resolved": "https://www.lfopensource.cn/kubecon-cloudnativecon-openinfra-summit-pytorch-conference-china/program/schedule/",
+    "status": 200,
+    "title": "Schedule | KubeCon + CloudNativeCon + OpenInfra Summit + PyTorch Conference China",
+    "checked": "2026-09-13T04:21:38.353Z"
+  }
+]

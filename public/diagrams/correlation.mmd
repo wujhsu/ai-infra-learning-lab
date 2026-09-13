@@ -1,0 +1,7 @@
+flowchart LR
+ T[请求 Trace ID] --> S[网关 / 引擎 Span]
+ S --> P[实例与 Pod UID]
+ P --> N[节点与 GPU UUID]
+ N --> M[设备指标时间窗口]
+ S --> W[排队 / Prefill / 输出阶段]
+ M -.辅助判断，非精确请求归因.-> W

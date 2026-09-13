@@ -1,0 +1,44 @@
+---
+title: "OpenStack 与 Kubernetes：迁移到底在迁什么？"
+description: "从虚拟机、容器和团队能力理解开放基础设施迁移。"
+order: 7
+module: 2
+minutes: 25
+prerequisites: ["02-kubernetes"]
+terms: ["pod", "controller", "gpu", "nccl", "dra"]
+sources: ["openstack", "schedule"]
+sessions: ["openinfra-migration"]
+question: "把虚拟机迁到 OpenStack，是否意味着应用已经完成容器化？"
+answer: "不是。运行平台迁移与应用架构改造是不同工作，容器化还涉及配置、状态、生命周期与部署方式，并需要独立验收。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+OpenStack 和 Kubernetes 经常一起出现，但不是同一个东西。OpenStack 提供计算、网络、存储等云基础设施服务；Kubernetes 主要编排容器化工作负载。Kubernetes 集群可以运行在虚拟机上，两者可以分层协作。
+
+## 先分清资源层与应用层
+
+虚拟机具有自己的 guest 操作系统内核；容器通常共享宿主内核。迁移虚拟机涉及镜像、磁盘、网络和运行平台；把应用改造成容器还涉及配置、状态、部署和运行方式。把虚拟机搬到开源平台，不等于已经完成应用现代化。
+
+## Vendor lock-in 不只是许可证
+
+如果团队无法解释、升级、恢复或替换一个关键组件，即使软件开源，也可能仍依赖单一服务商。开放接口、可移植数据、文档、人才和恢复演练一起决定实际控制能力。
+
+## 会议中的迁移方法
+
+Viettel 案例强调 pilot、迁移工厂、跨职能团队和社区参与。pilot 是先选择少量可控工作负载验证；迁移工厂则把重复评估、迁移和验收步骤标准化。
+
+现有妙记没有配套公开讲义，部分数字与专名仍有识别歧义。本站保留方法论，不把缺乏分母的百分比写成普遍成功率。
+
+## 一个可执行的迁移评估表
+
+按业务重要性、状态性、依赖、数据量、停机容忍、恢复要求和团队所有权分组。先选回滚路径清楚的 pilot，验证网络、存储和监控，再扩大范围。
+
+迁移验收不能只有“能开机”：还要检查业务正确性、备份恢复、性能、权限、运维交接和退出旧平台的条件。明确哪些应用只搬运行平台，哪些需要重新设计。
+
+## 与 AI Infra 主线的联系
+
+模型平台同样有权重与数据、网络、加速器和工作负载编排。能否开放替换某一层，依赖上层是否通过明确契约使用它。前面的 PyTorch、<Term id="nccl" label="NCCL" />、<Term id="dra" label="DRA" /> 讨论，最终都回到这条工程原则。

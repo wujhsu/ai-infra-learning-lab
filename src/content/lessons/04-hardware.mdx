@@ -1,0 +1,55 @@
+---
+title: "GPU 的时间花在计算，还是搬数据？"
+description: "区分容量、带宽、延迟和计算吞吐，用一个下界模型定位瓶颈。"
+order: 4
+module: 1
+minutes: 25
+prerequisites: ["03-attention"]
+terms: ["gpu", "hbm", "bandwidth", "roofline", "kernel", "prefill", "decode"]
+sources: ["cuda", "optim"]
+sessions: ["speedy-optimizers", "kernelagent"]
+question: "一个算子主要受内存带宽限制，换成计算峰值翻倍但带宽不变的 GPU，一定会快很多吗？"
+answer: "不一定。先估计并测量实际字节流量、带宽和操作强度。可能需要减少读写或增加复用；更高计算峰值只有在计算约束重要时才产生明显收益。"
+lab: "03-kernel"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+“这张 <Term id="gpu" label="GPU" /> 很快”并不能回答某个模型是否会快。一个工作负载既要搬数据，又要执行运算；任何一个环节跟不上，都可能使另一部分等待。
+
+## 三种容易混淆的硬件量
+
+**容量**告诉你能放多少数据，例如 80 GiB。<Term id="bandwidth" /> 告诉你每秒能搬多少，例如有效 GB/s。**延迟**告诉你一次操作多久开始得到结果。装得下、搬得快、响应快，是三个问题。
+
+模型权重通常先从存储进入主内存，再通过设备互连进入 GPU 内存。执行时，数据在设备内存、缓存、共享内存和寄存器之间流动。具体路径受硬件和 kernel 实现影响，不是每个数据都必须显式经过每一级。
+
+<figure className="knowledge-image"><a href={asset('images/gpu-data-movement.webp')} data-zoom data-caption="原创中文教学图"><img src={asset('images/gpu-data-movement.webp')} alt="CPU 主内存通过 PCIe 连接 GPU 显存，计算单元通过片上存储复用数据" loading="lazy"/></a><figcaption>原创知识图：重点区分设备间搬运与 GPU 内部的数据复用。不同 GPU 的显存类型和容量不同。</figcaption></figure>
+
+## 给执行时间估一个下界
+
+设算子需要 $F$ 次浮点运算，至少搬运 $B$ 字节数据。硬件有效计算速度为 $P$ FLOP/s，有效带宽为 $W$ byte/s。那么理想时间下界可以写成：
+
+$$T\ge\max(F/P,\ B/W)$$
+
+例如一次工作需要 20 GFLOP、读取和写入共 4 GB。假设有效计算速度 100 TFLOP/s、有效带宽 1 TB/s，计算项约 0.2 ms，传输项约 4 ms。即使把计算峰值翻倍，主要的 4 ms 搬运约束仍在。
+
+这些数字是说明方法的教学假设，不能用作 GPU benchmark。真实时间还包括 kernel launch、同步、布局转换及未重叠部分。
+
+## Roofline 在解释什么
+
+<Term id="roofline" /> 用操作强度 $I=F/B$，把性能约束写为 `min(P, W×I)`。当每搬一个字节只做很少运算，带宽更容易成为瓶颈；增加数据复用或融合操作，可以减少 B，从而提高操作强度。
+
+融合也会有代价。一个 kernel 同时做更多工作，可能消耗更多寄存器和共享内存，减少可并发执行的线程块。优化不是“融合越多越好”，而是基于实际 shape、硬件和测量做取舍。
+
+## 为什么 Decode 经常需要关注带宽
+
+小 batch 的普通 <Term id="decode" label="Decode" /> 每个序列只推进很少 token，却要访问许多权重与历史 KV，因此经常具有较低操作强度。增大 batch 可以让权重读取服务更多 token，但也增加 KV 占用和排队。<Term id="prefill" label="Prefill" /> 通常处理更多输入位置，矩阵计算规模更大，但也不是所有配置下都必然计算受限。
+
+## 用讲义理解减少搬运的价值
+
+<Slide id="speedy-optimizers-4" minute="优化器短场次把横向融合与纵向融合区分开：前者批量处理多个 tensor，后者把连续更新步骤放进更少的 kernel，从而减少中间写回和 launch。" />
+
+阅读这张图时先找中间结果：如果每一步都写回显存，下一步再读入，会重复花费带宽。再找融合后仍必须保留的状态：不能为了少读写而破坏算法正确性。

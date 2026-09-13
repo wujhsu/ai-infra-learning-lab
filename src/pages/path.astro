@@ -1,0 +1,4 @@
+---
+import Base from '../layouts/Base.astro';import {modules,titles,asset} from '../data/curriculum';
+---
+<Base title="学习路径" active="path/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">8 个模块 · 24 个问题</span><h1>把知识接成一条路</h1><p>第一次建议顺序学习。每节提供前置知识入口；已熟悉的部分可以跳过。阅读和实验分别记录。</p></header>{modules.map((m,i)=><section class="path-module" id={`module-${i+1}`}><div><span class="eyebrow">模块 0{i+1}</span><h2>{m.title}</h2><p>{m.subtitle}</p></div><div>{titles.slice(i*3,i*3+3).map(([id,title])=><a class="course-row" data-course={`learn/${id}`} data-title={title} href={asset(`learn/${id}/`)}><span>{id.slice(0,2)} · {title}</span><small>进入学习 →</small></a>)}</div></section>)}</div></Base>

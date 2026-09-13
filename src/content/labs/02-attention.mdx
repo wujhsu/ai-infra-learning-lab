@@ -1,0 +1,41 @@
+---
+title: "实验 02 · 验证 K/V 复用"
+description: "在 CPU 上运行一个可手算的注意力例子，确认缓存结果与完整计算一致。"
+order: 2
+module: 0
+minutes: 25
+verified: "标准库 CPU 实验已在本机运行，缓存与全量重算结果一致"
+prerequisites: ["03-attention"]
+terms: ["attention", "tensor", "kv-cache", "gpu"]
+sources: ["attention"]
+sessions: []
+question: "为什么这个实验通过不能证明某个真实引擎的 prefix cache 实现没有 bug？"
+answer: "它只验证简化数学结构，不覆盖多层、位置编码、分页、并行布局、并发和实际实现。真实引擎还需要对应的集成与边界测试。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+本实验只需要 Python 3 标准库，没有 <Term id="gpu" label="GPU" /> 依赖。它验证注意力中间结果复用的数学结构，不模拟完整语言模型的预测能力。
+
+## 运行前先预测
+
+历史向量为 `[1,0]` 和 `[0,1]`，新位置为 `[1,1]`，演示中 Q/K/V 变换都取单位矩阵。先计算新查询与三个键的缩放点积，再估计 softmax 权重。
+
+```bash
+python3 labs/attention/attention.py
+```
+
+脚本比较完整重建历史与复用历史缓存的输出，要求每一维误差小于 `1e-12`。输出包含两条向量与 `equal: true`。这里的阈值适用于这个小型双精度示例，不能照搬到 BF16 GPU kernel。
+
+## 改变一个条件
+
+把一个历史向量改掉但保持旧缓存不变，预测结果是否仍一致。再同步更新缓存，重新比较。这个实验说明缓存有效性依赖输入与计算条件，不能随意跨上下文复用。
+
+增加第三个历史位置，观察缓存元素数量如何增长。记录查询维度、历史长度、K/V 元素数，连接到主线的容量公式。
+
+## 验收与边界
+
+提交手算权重、脚本输出和修改历史后的差异解释。该脚本没有多层、位置编码、训练或采样，不能由它推断真实模型速度。没有外部资源需要清理；保留你的修改副本和结果。

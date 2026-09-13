@@ -1,0 +1,66 @@
+---
+title: "模型怎样利用前面的文字？"
+description: "用一个两位置例子看懂 Q、K、V，然后理解为什么可以缓存。"
+order: 3
+module: 0
+minutes: 25
+prerequisites: ["02-kubernetes"]
+terms: ["tensor", "attention", "token", "kv-cache", "gpu", "gqa"]
+sources: ["attention", "pagedattention"]
+sessions: []
+question: "为什么生成新 token 时，不需要重算完整历史 K/V？这是否意味着长上下文不再增加计算？"
+answer: "因果前缀在相同模型与计算条件下对应的历史 K/V 可复用。但新查询仍需读取并处理可见历史，所以历史长度依然影响缓存容量和注意力工作。"
+lab: "02-attention"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+解释 KV Cache 前，先回答一个更小的问题：模型正在处理当前位置，它如何从前面的内容中取出相关信息？<Term id="attention" /> 提供了一种可学习的加权汇总方式。
+
+## 把形状说清楚
+
+<Term id="tensor" /> 是带形状的多维数组。设一个简化输入有 3 个 token，每个表示有 4 个数字，可以把它写成形状 `[3,4]` 的矩阵 X。这里的数字不是汉字编码，而是网络中的连续向量表示。
+
+线性变换产生查询 Q、键 K 和值 V：`Q = XWq`、`K = XWk`、`V = XWv`。可以把 Q 理解为“当前位置拿什么特征找信息”，K 是“每个位置提供什么匹配特征”，V 是“匹配后汇总的内容表示”。这只是直觉，三者都是学习得到的数值，不是显式关键词。
+
+## 做一次最小注意力计算
+
+设当前查询 `q=[1,0]`，两个历史键为 `[1,0]` 和 `[0,1]`，值分别为 `[10,0]` 和 `[0,10]`。点积得到分数 1 和 0。再除以键维度平方根 $\sqrt{2}$，并通过 softmax 转成和为 1 的权重，大约为 0.67 和 0.33。因此汇总结果约为 `[6.7,3.3]`。
+
+$$\operatorname{Attention}(Q,K,V)=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}+M\right)V$$
+
+其中 $d_k$ 是键向量维度；$M$ 是掩码，不允许关注的位置加入负无穷，使其 softmax 权重为零。因果语言模型在普通自回归生成中不能读取未来位置。
+
+```python
+import math
+q = [1.0, 0.0]
+keys = [[1.0, 0.0], [0.0, 1.0]]
+values = [[10.0, 0.0], [0.0, 10.0]]
+scores = [sum(a*b for a, b in zip(q, k)) / math.sqrt(2)
+          for k in keys]
+exp_scores = [math.exp(s - max(scores)) for s in scores]
+weights = [s / sum(exp_scores) for s in exp_scores]
+out = [sum(w*v[j] for w, v in zip(weights, values)) for j in range(2)]
+print(weights, out)
+```
+
+减去最大分数不改变 softmax 比例，却有助于避免指数溢出。这里的代码只展示数学含义，不代表 <Term id="gpu" label="GPU" /> 的高性能实现方式。
+
+## 为什么历史 K/V 可以留下来
+
+在同一模型、同一上下文前缀和相同必要计算条件下，历史位置的 K/V 不需要因为生成了新 token 而全部重算。新的位置生成自己的 Q/K/V，把新 K/V 追加进去，再用新的 Q 读取历史 K/V。
+
+这就是 <Term id="kv-cache" /> 的基本出发点。缓存省掉的是历史中间表示的重复计算；新位置仍需要读取相应历史信息。上下文变长时，缓存本身和注意力读取成本都会增长。
+
+## 多头与分组查询改变什么
+
+一个注意力头是一套查询与汇总通道。MHA 为各查询头提供对应 K/V 头；MQA 让多个查询头共享一组 K/V；<Term id="gqa" label="GQA" /> 则分组共享。因此计算 KV 大小时要用 **KV head 数**，不能看到模型有 32 个查询头，就机械乘 32。
+
+这里讲的是典型 Transformer 注意力。滑动窗口、混合状态空间模型、特殊 KV 压缩等结构会改变缓存布局和保留范围，后续容量公式都明确限定适用范围。
+
+## 把知识转成检查动作
+
+找一个模型的配置文件，定位层数、查询头数、KV head 数和 hidden size。若 head dimension 没有单独给出，不能在所有架构中都无条件用 hidden size 除查询头数；先看具体模型实现。把查到的字段和来源一起记下来，再进入显存估算。

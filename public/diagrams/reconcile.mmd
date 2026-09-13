@@ -1,0 +1,7 @@
+flowchart LR
+ D[声明：需要两个副本] --> A[API Server]
+ A --> C[控制器：比较实际状态]
+ C --> P[创建 Pod]
+ P --> S[调度器：选择节点]
+ S --> K[kubelet：启动与探测]
+ K -.状态反馈.-> A

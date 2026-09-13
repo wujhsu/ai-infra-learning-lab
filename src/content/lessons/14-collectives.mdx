@@ -1,0 +1,53 @@
+---
+title: "多张 GPU 怎样交换结果？"
+description: "用小数组理解集合通信，再解释拓扑、rank 和测量口径。"
+order: 14
+module: 4
+minutes: 25
+prerequisites: ["13-parallelism"]
+terms: ["rank", "allreduce", "nccl", "rdma", "reducescatter", "gpu", "moe", "lsa", "gin"]
+sources: ["nccl-api", "nccl"]
+sessions: ["advanced-nccl"]
+question: "两张卡执行 AllGather 后，结果应该是逐元素求和吗？如果某个 rank 没调用同一 collective 会怎样？"
+answer: "AllGather 收集各参与者的数据，不自动求和。集合通信需要全体参与者遵守匹配协议；缺失或顺序不一致可能导致等待、错误或超时。"
+lab: "07-nccl"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+分布式程序中，“交换数据”有多种准确含义。把所有数组拼起来、把数组按元素求和、把不同片段分给不同参与者，是不同的操作。
+
+## 从两张卡的数字开始
+
+<Term id="rank" /> 0 保存 `[1,2]`，rank 1 保存 `[3,4]`。<Term id="allreduce" /> 求和后，两者都得到 `[4,6]`。AllGather 后，两者得到包含 `[1,2,3,4]` 的集合结果；Broadcast 则由一个源把自己的值发送给其他参与者。
+
+<Term id="reducescatter" label="ReduceScatter" /> 可以理解为先对全体数据做归约，再让每个 rank 留下指定的部分。AllToAll 则让每个 rank 分别向其他 rank 发送不同分块，常见于专家路由。
+
+<Slide id="advanced-nccl-9" minute="讲义先用 Host API 的 send/recv 与 collectives 建立基线，再解释 Device API 为什么需要更细粒度通信。" />
+
+## 每个参与者必须遵守同一协议
+
+集合通信需要参与者在调用、数据类型、元素数量和顺序上满足匹配要求。如果一个 rank 提前走入下一次 collective，另一个仍在前一次，可能挂起或出错。局部日志看似正常，不代表整个组达成一致。
+
+点对点发送接收也不是随便成对写就安全。需要考虑执行顺序、缓冲生命周期和同步。复杂程序应从可验证的小通信模式开始。
+
+## 单机和跨节点的路径不同
+
+<Term id="nccl" /> 根据能力和拓扑使用不同通信路径。节点内可能涉及 PCIe、NVLink 和 P2P；跨节点涉及 NIC、网络和 <Term id="rdma" />。GPU 与 NIC 是否可直接传输、是否需要主内存中转，要看硬件、驱动和配置。
+
+<Diagram id="topology" caption="准确拓扑示意：NVLink 连接 GPU；NIC 通过 PCIe 连接主机拓扑，跨节点由网络连接 NIC。" />
+
+## 怎么读带宽结果
+
+算法带宽常按用户数据量除耗时计算；总线带宽会根据通信算法或 collective 数据流量作换算。两者不是同一个数，不能混合比较。小消息更容易受启动延迟影响，大消息更容易表现带宽约束。
+
+记录 <Term id="gpu" label="GPU" /> 型号、节点数、网卡和链路、消息大小、NCCL/CUDA/驱动版本、热身与重复次数。改变 rank 数时，还要考虑同一 collective 的实际传输模式发生变化。
+
+## 排查挂起时先缩小问题
+
+先确认所有 rank 都能看见正确设备，再测试主机/DNS 发现、单对节点连通性，然后做小规模 collective。不要让一个复杂 <Term id="moe" label="MoE" /> 模型承担网络连通性测试的全部责任。
+
+NCCL 教程源码包含两 rank <Term id="lsa" label="LSA" /> 和 <Term id="gin" label="GIN" /> barrier 示例。主线实验先做传统 AllReduce 正确性验证，进阶专题再进入设备侧同步，避免还没建立 collective 基线就直接调试融合 kernel。

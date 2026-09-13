@@ -1,0 +1,61 @@
+---
+title: "PyTorch 通用化：统一接口与硬件差异"
+description: "看懂框架后端抽象，而不把“写一次”误解为性能自动迁移。"
+order: 2
+module: 0
+minutes: 25
+prerequisites: ["05-pytorch"]
+terms: ["tensor", "kernel", "gpu", "dtype"]
+sources: ["accelerator", "pytorch", "compile"]
+sessions: ["pytorch-generalization"]
+question: "统一 accelerator API 是否意味着同一模型在不同硬件上性能一致？"
+answer: "不意味着。统一的是公共行为契约，实际算子实现、内存层次、通信和编译优化仍不同，需要分别验证正确性、覆盖范围和性能。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+把 `cuda` 字符串换成另一个设备名称，有时能让简单张量代码运行。但完整程序还涉及设备发现、Stream、Event、随机数、内存、图执行、通信和编译后端。通用化要处理的是一组契约。
+
+## 用户入口与内部接口
+
+`torch.accelerator` 提供面向加速器的公共入口；TorchInductor 内部的设备抽象则服务于编译器。它们处在不同层，不能把内部后端契约当作所有应用都该依赖的稳定 API。
+
+<Slide id="pytorch-generalization-8" />
+
+写应用时先依赖公开接口，再明确哪些部分是后端专用。例如通用张量运算可以复用，但 NVIDIA profiler 与某些 CUDA kernel 不能直接运行在其他硬件上。
+
+## Stream 和 Event 为什么值得抽象
+
+Stream 表达一条有序提交队列；Event 可以标记完成或建立依赖。统一名称帮助上层组织异步工作，但设备的同步语义、计时能力和支持范围仍需核对。
+
+跨设备拷贝也不只是一个 API。是否异步、是否需要 pinned host memory、是否允许直接 P2P，都取决于路径与实现。接口看起来统一，不代表没有性能差异。
+
+## 一个迁移审计方法
+
+把代码中的设备行为分成三类：公开通用 API、公开后端专用 API、内部实现依赖。第一类优先复用；第二类需要替代与能力检测；第三类尽量移出应用边界，或者固定版本并接受维护责任。
+
+```python
+# 2.14.0 基线：先检查是否存在可用 accelerator。
+import torch
+available = torch.accelerator.is_available()
+print('有可用加速器:', available)
+if available:
+    print('当前类型:', torch.accelerator.current_accelerator())
+```
+
+这只检查入口，不证明整个模型所有算子可运行。实际迁移还需要模型级正确性、编译和性能测试。
+
+## 迁移的验收矩阵
+
+逐项验证 <Term id="dtype" label="dtype" />、算子覆盖、动态 shape、训练/推理、随机数、checkpoint、分布式通信和 profiler。对每项记录“支持、受限、不支持、未验证”，不要用一个总勾选掩盖局部差异。
+
+先比较数值误差和任务质量，再比较性能。两个后端在同一容差内不意味着逐位相同，复现要求要与实际任务相符。
+
+## 会议路线图怎样阅读
+
+<Slide id="pytorch-generalization-15" />
+
+会议展示的是当时的演进方向。Graph、memory、generator 等入口在不同版本的完成度可能不同，本文以当前稳定文档与 2.14.0 发布为核验基线。对未验证后端不作支持承诺。

@@ -1,0 +1,110 @@
+[
+  {
+    "id": "2026-09-08-keynotes",
+    "title": "September 8 Morning Keynotes",
+    "date": "2026-09-08",
+    "time": "09:00-10:30",
+    "summary": "上午内容给出一条完整的开放 AI 栈：模型/多模态智能提供能力，PyTorch 提供训练与运行框架，vLLM/llm-d 等负责推理，Kubernetes/CNCF 项目负责调度和运营，OpenInfra/Kata 提供硬件、隔离和执行边界。反复出现的共同问题是昂贵异构算力如何被统一抽象、提高利用率，同时又保持开放接口与上游协作。",
+    "speakers": "",
+    "hasSlides": true
+  },
+  {
+    "id": "advanced-nccl",
+    "title": "Advanced NCCL Tutorial: Beyond Collectives",
+    "date": "2026-09-08",
+    "time": "13:45-15:00",
+    "summary": "这不是一场“如何调用 AllReduce”的入门课，而是解释为什么现代 MoE、低时延推理和通信-计算融合需要把通信控制权下沉进 GPU kernel。NCCL Device API 将设备侧通信拆成四个可组合对象：device communicator 决定通信能力，window 指定跨 rank 可访问内存，team 划定 rank 子集，coop 划定协作线程范围。主机只做一次能力查询、内存注册和对象创建；热点循环中由 kernel 直接进行 LSA、multimem 或 GIN 操作。",
+    "speakers": "Jeff Hammond, Hanyue He, Ke Wen",
+    "hasSlides": true
+  },
+  {
+    "id": "kernelagent",
+    "title": "KernelAgent: Hardware-Guided GPU Kernel Optimization via Multi-Agent Orchestration",
+    "date": "2026-09-08",
+    "time": "15:30-16:00",
+    "summary": "KernelAgent 把 kernel 优化建模为“规划、编码、真实硬件执行、profiling、再规划”的闭环，而非一次性代码生成。系统的耐久资产不是某几个 kernel，而是可跨任务复用的验证器、性能模型、调优日志和硬件经验。官方摘要给出的结果是：在全部 100 个 KernelBench L1 任务上，相比早期生成 kernel 提速 2.02 倍；相对默认 `torch.compile` 平均提速 1.56 倍，100 个任务中胜出 65 个，在 H100 上达到硬件 roofline 的 89%。这些数字来自官方日程，现场录音片段本身不足以复现实验。",
+    "speakers": "Kaiming Cheng, Jack Khuu, Laura Wang",
+    "hasSlides": true
+  },
+  {
+    "id": "self-healing-rollouts",
+    "title": "Self-Healing Rollouts: Automating Production Fixes with Agentic AI",
+    "date": "2026-09-08",
+    "time": "16:15-16:45",
+    "summary": "Argo Rollouts 已能依据预定义指标推进或回滚 canary，但静态 PromQL/阈值只能发现预先想过的故障。讲者把一个 agentic analysis 层接到 Rollouts：并行收集 stable/canary 的 metrics 和 logs，分析异常、由第二个评分 agent 复核，再决定回滚，并为可修复问题生成 PR。最重要的控制边界仍是 GitOps 和人工 review，而不是让模型直接改变生产状态。",
+    "speakers": "Kevin Dubois, Daniel Oh",
+    "hasSlides": true
+  },
+  {
+    "id": "speedy-optimizers",
+    "title": "Speedy But Sturdy PyTorch Optimizers",
+    "date": "2026-09-08",
+    "time": "16:50-16:55",
+    "summary": "PyTorch optimizer 多为 memory-bound。提速的基本方法是减少参数、梯度和状态在 VRAM 与 SM 之间的往返及 kernel launch 次数；用户侧最直接的入口是 `fused=True`。但性能不能以破坏 API 稳定性为代价，因此 BF16 state、functional optimizer 和 Muon 等能力先通过小而可组合的接口暴露，实验性部分继续留在内部。",
+    "speakers": "Jane Xu",
+    "hasSlides": true
+  },
+  {
+    "id": "lws-preflight",
+    "title": "Before vLLM starts: Preflight Checks for LWS for LLM Inference on K8S",
+    "date": "2026-09-08",
+    "time": "17:04-17:09",
+    "summary": "分布式推理最昂贵的故障常不是“起不来”，而是服务启动后才暴露吞吐不稳、p99 抖动或跨节点性能退化。方案是在 vLLM 主容器前，用与实际 workload 同 Pod、同节点、同 GPU 资源上下文的 init containers 执行 preflight；任何基础设施不变量不满足时尽早失败。",
+    "speakers": "Peter Pan",
+    "hasSlides": true
+  },
+  {
+    "id": "2026-09-09-keynotes",
+    "title": "September 9 Morning Keynotes",
+    "date": "2026-09-09",
+    "time": "09:00-10:30",
+    "summary": "第二天把“开放 AI 全栈”落到基础设施控制权：异构 GPU 不只需要算力，还需要 placement、隔离、拓扑、供应和成本控制。OpenStack、Kubernetes、Kata/Confidential Containers、PyTorch、SGLang/Miles 等项目分别解决不同层级，目标是把多代、多厂商硬件变成可统一消费的 token factory，而不是形成新的单厂商锁定。",
+    "speakers": "",
+    "hasSlides": false
+  },
+  {
+    "id": "openinfra-migration",
+    "title": "Escaping the Vendor Trap: A Journey for Migrating Legacy Infrastructure to OpenStack and K8s",
+    "date": "2026-09-09",
+    "time": "11:00-11:30",
+    "summary": "这场的重点不是“VMware 换成 OpenStack”的产品替换，而是把基础设施控制权、团队能力和重复迁移流程一起内化。Viettel 从容易隔离的应用开始，以三人核心团队构建最小云，验证后再形成 migration factory；最终组合 OpenStack、Ceph、Kubernetes、Prometheus 等开放组件。官方简介称截至 2025 年末超过 80% 基础设施完成迁移。",
+    "speakers": "Trong Vinh Nguyen, Quoc Dat Le",
+    "hasSlides": false
+  },
+  {
+    "id": "tiered-kvcache",
+    "title": "To Cache or Not to Cache? A Tiered KVCache Storage System for Agent Scenarios",
+    "date": "2026-09-09",
+    "time": "13:45-14:15",
+    "summary": "Agent 把 KV Cache 生命周期从“单请求”拉长到“整个 workflow”。多轮长输入/短输出使前缀复用率很高，但有价值的块未必是最近访问的块：传统 LRU 可能先淘汰前缀链头，导致后续整条链无法复用，同时还保留已结束会话的无效缓存。UCM（Unified Cache Manager）因此把生命周期/位置感知策略与传输、底层存储解耦，并把多种介质抽象为平级 global storage。",
+    "speakers": "Jingbin Zhang, Wang Cong, yun bai",
+    "hasSlides": false
+  },
+  {
+    "id": "llm-observability",
+    "title": "End-to-End Observability for LLM Inference: From Token to GPU",
+    "date": "2026-09-09",
+    "time": "14:30-15:00",
+    "summary": "传统 RED/USE 监控只看到请求与机器，而 LLM serving 的用户体验由 token 流、continuous batching、KV Cache 和 GPU/网络共同决定。GPU utilization 90% 可能只是等待或 memory-bound，并不代表有效产出。方案是建立从业务、AI API、gateway、inference engine、Kubernetes、host、CUDA/NCCL 到 GPU 的分层观测，并用统一语义与 TraceID 把层间数据关联起来。",
+    "speakers": "Jared Tan, Murphy Chen, Nicole Li",
+    "hasSlides": true
+  },
+  {
+    "id": "pytorch-generalization",
+    "title": "Write Once, Run Anywhere: PyTorch's Generalization Journey",
+    "date": "2026-09-09",
+    "time": "15:30-16:00",
+    "summary": "PyTorch 多后端扩展的主要成本不是“再加一个 device string”，而是每个 module、runtime API 和 test suite 都含有 CUDA/后端分支。Generalization 的路线是从模块级统一（Autocast、Inductor）走向 `torch.accelerator` 的端到端 runtime 抽象，再用通用测试验证后端契约。旧的 device-specific API 保留，但新旧入口必须操作同一底层状态。",
+    "speakers": "Yu Guangye, Eikan Wang",
+    "hasSlides": true
+  },
+  {
+    "id": "kubernetes-dra",
+    "title": "Kubernetes DRA Architecture: Scheduling, Status, and Topology at Scale",
+    "date": "2026-09-09",
+    "time": "16:15-16:45",
+    "summary": "Device Plugin 把 accelerator 简化为整数资源，适合“要两张卡”，却难以表达 GPU shape、共享模式、NIC/NUMA/PCIe/NVLink 拓扑、健康状态和访问配置。Dynamic Resource Allocation（DRA）用 DeviceClass、ResourceClaim/Template、ResourceSlice、结构化参数和 driver prepare/unprepare 把“选什么设备、怎样使用、是否就绪”纳入 Kubernetes 控制面。",
+    "speakers": "Paco Xu, Kang Zhang",
+    "hasSlides": true
+  }
+]

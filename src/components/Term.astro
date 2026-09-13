@@ -1,0 +1,5 @@
+---
+import glossary from '../data/glossary.json';
+const {id,label}=Astro.props;const t=glossary.find(x=>x.id===id);if(!t)throw new Error(`Unknown term ${id}`);
+---
+<button class="term" data-term={id} aria-label={`解释 ${t.name}`}>{label||t.name}</button><noscript><span class="term-static">（{t.full}：{t.definition}）</span></noscript>

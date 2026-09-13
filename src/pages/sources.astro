@@ -1,0 +1,4 @@
+---
+import Base from '../layouts/Base.astro';import sources from '../data/sources.json';
+---
+<Base title="资料与版本"><div class="page-wrap"><header class="page-title"><span class="eyebrow">让知识可以追溯</span><h1>来源、版本与证据边界</h1><p>会议记录提供问题和案例；官方资料用于核对机制与当前能力；教学模型明确标出简化条件。</p></header><div class="source-note">文档核验不等于硬件复现。网站交互与构建经过测试；需要 GPU、网络或集群的实验在本机未运行，实验页面保留验证状态。</div><div class="resource-grid" style="margin-top:24px" data-pagefind-body>{sources.map(s=><section class="resource-card" id={s.id}><small>{s.kind} · {s.checked}</small><h2><a href={s.url} target="_blank" rel="noopener">{s.title} ↗</a></h2><p>{s.version}</p></section>)}</div></div></Base>

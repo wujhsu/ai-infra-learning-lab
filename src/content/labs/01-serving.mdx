@@ -1,0 +1,51 @@
+---
+title: "实验 01 · 固定版本并运行 vLLM"
+description: "准备镜像与模型 commit，验证健康、接口与资源信息。"
+order: 1
+module: 0
+minutes: 25
+prerequisites: ["06-vllm"]
+terms: ["gpu", "kv-cache"]
+sources: ["vllm", "vllm-serving"]
+sessions: []
+question: "为什么固定镜像标签之后还保存 digest？"
+answer: "标签是人类可读版本标识，digest 对应具体镜像内容，能提高复查时确定性。模型 revision 和硬件环境仍需分别记录。"
+---
+import Term from '../../components/Term.astro';
+import Slide from '../../components/Slide.astro';
+import Diagram from '../../components/Diagram.astro';
+import Demo from '../../components/Demo';
+import {asset} from '../../data/curriculum';
+
+本实验需要可运行 vLLM 0.29.0 的 NVIDIA <Term id="gpu" label="GPU" />、兼容驱动、Docker 与 NVIDIA Container Toolkit。它尚未在作者本机执行；命令和版本已作静态核对，硬件结果需要你实际记录。
+
+## 准备与固定输入
+
+下载实验包，进入 `labs/serving`。运行 `python3 prepare.py`，它通过模型仓库 API 解析当前 commit，写出 `experiment.env` 与 `environment.json`。这一步只解析元数据，不运行 GPU。
+
+```bash
+cd labs/serving
+python3 prepare.py
+bash serve.sh
+```
+
+`serve.sh` 固定镜像标签并保存拉取到的 digest，使用解析后的模型 revision；缓存目录绑定到当前实验目录。请同时保存 `nvidia-smi` 输出和启动日志。模型 commit 锁定后，即使默认分支更新，本次实验仍引用相同权重。
+
+## 验证服务边界
+
+在另一终端请求 `/health`、`/v1/models` 和 `/metrics`。确认 served model name 为 `lab-model`，再运行一次流式请求。成功 HTTP 状态不是唯一验收，还要保存非空输出及最终使用量。
+
+```bash
+curl -f http://127.0.0.1:8000/health
+curl -f http://127.0.0.1:8000/v1/models
+curl -f http://127.0.0.1:8000/metrics > metrics-before.txt
+python3 measure_stream.py --requests 1 --output smoke.jsonl
+```
+
+## 如何解释失败
+
+设备不可见时先查容器 runtime 与驱动；加载 OOM 时查模型、上下文预算与其他进程；模型名错误时查接口返回。不要把所有错误都归为“vLLM 不稳定”。
+
+## 验收与清理
+
+提交环境文件、镜像 digest、启动日志、smoke JSONL 与指标快照。记录冷启动时间，随后热身一次再进入性能实验。结束后运行 `docker stop inference-lab`；容器会删除，模型缓存与结果文件保留。不要删除结果后才写复盘。

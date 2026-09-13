@@ -1,0 +1,258 @@
+[
+  {
+    "id": "k8s",
+    "title": "Kubernetes：概念与组件",
+    "url": "https://kubernetes.io/docs/concepts/overview/components/",
+    "version": "概念文档",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "attention",
+    "title": "Attention Is All You Need",
+    "url": "https://arxiv.org/abs/1706.03762",
+    "version": "2017 原始论文",
+    "checked": "2026-09-13",
+    "kind": "研究论文"
+  },
+  {
+    "id": "cuda",
+    "title": "CUDA Programming Guide",
+    "url": "https://docs.nvidia.com/cuda/cuda-programming-guide/",
+    "version": "滚动文档；硬件能力按目标 GPU 核对",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "pytorch",
+    "title": "PyTorch 2.14.0 发布",
+    "url": "https://github.com/pytorch/pytorch/releases/tag/v2.14.0",
+    "version": "2.14.0",
+    "checked": "2026-09-13",
+    "kind": "官方发布"
+  },
+  {
+    "id": "compile",
+    "title": "torch.compile 编译模型",
+    "url": "https://docs.pytorch.org/docs/stable/torch.compiler.html",
+    "version": "stable；示例基线 2.14.0",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "vllm",
+    "title": "vLLM 0.29.0 发布",
+    "url": "https://github.com/vllm-project/vllm/releases/tag/v0.29.0",
+    "version": "0.29.0",
+    "checked": "2026-09-13",
+    "kind": "官方发布"
+  },
+  {
+    "id": "vllm-serving",
+    "title": "vLLM OpenAI Compatible Server",
+    "url": "https://docs.vllm.ai/en/latest/serving/openai_compatible_server/",
+    "version": "latest；实验固定 0.29.0",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "vllm-metrics",
+    "title": "vLLM Production Metrics",
+    "url": "https://docs.vllm.ai/en/latest/usage/metrics/",
+    "version": "latest；指标需对照部署版本 HELP",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "vllm-prefix",
+    "title": "Automatic Prefix Caching",
+    "url": "https://docs.vllm.ai/en/latest/features/automatic_prefix_caching/",
+    "version": "latest",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "pagedattention",
+    "title": "PagedAttention：分页管理 KV Cache",
+    "url": "https://arxiv.org/abs/2309.06180",
+    "version": "2023 原始论文",
+    "checked": "2026-09-13",
+    "kind": "研究论文"
+  },
+  {
+    "id": "vllm-pd",
+    "title": "Disaggregated Prefilling",
+    "url": "https://docs.vllm.ai/en/latest/features/disagg_prefill/",
+    "version": "latest；connector 能力与版本相关",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "vllm-distributed",
+    "title": "Distributed Inference and Serving",
+    "url": "https://docs.vllm.ai/en/latest/serving/parallelism_scaling/",
+    "version": "latest",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "nccl",
+    "title": "NCCL Device-Initiated Communication",
+    "url": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/deviceapi.html",
+    "version": "2.31.2 文档；实验独立固定 2.31.2",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "nccl-api",
+    "title": "NCCL Collective Operations",
+    "url": "https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html",
+    "version": "2.31.2",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "device-plugin",
+    "title": "Kubernetes Device Plugins",
+    "url": "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/",
+    "version": "Kubernetes 1.37",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "dra",
+    "title": "How DRA Works",
+    "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/how-dra-works/",
+    "version": "Kubernetes 1.37",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "dra-features",
+    "title": "DRA Features：成熟度和开关",
+    "url": "https://kubernetes.io/docs/concepts/resource-management/dynamic-resource-allocation/dra-features/",
+    "version": "Kubernetes 1.37；逐功能核对",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "lws",
+    "title": "LeaderWorkerSet 0.10.0",
+    "url": "https://github.com/kubernetes-sigs/lws/releases/tag/v0.10.0",
+    "version": "0.10.0",
+    "checked": "2026-09-13",
+    "kind": "官方发布"
+  },
+  {
+    "id": "lws-api",
+    "title": "LeaderWorkerSet v1 API",
+    "url": "https://lws.sigs.k8s.io/docs/reference/leaderworkerset.v1/",
+    "version": "v1 API；以 0.10.0 安装的 CRD 为准",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "lws-preflight",
+    "title": "LWS Preflight 讨论 PR #813",
+    "url": "https://github.com/kubernetes-sigs/lws/pull/813",
+    "version": "提案来源；不等同已发布字段",
+    "checked": "2026-09-13",
+    "kind": "上游提案"
+  },
+  {
+    "id": "otel",
+    "title": "OpenTelemetry Signals",
+    "url": "https://opentelemetry.io/docs/concepts/signals/",
+    "version": "概念文档",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "otel-genai",
+    "title": "GenAI Semantic Conventions 官方迁移入口",
+    "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+    "version": "迁移中；采用方必须固定规范版本",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "prometheus",
+    "title": "Prometheus Histograms and Summaries",
+    "url": "https://prometheus.io/docs/practices/histograms/",
+    "version": "概念文档",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "rollouts",
+    "title": "Argo Rollouts Analysis & Progressive Delivery",
+    "url": "https://argo-rollouts.readthedocs.io/en/stable/features/analysis/",
+    "version": "实验基线 1.10.0",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "rollouts-release",
+    "title": "Argo Rollouts 1.10.0",
+    "url": "https://github.com/argoproj/argo-rollouts/releases/tag/v1.10.0",
+    "version": "1.10.0",
+    "checked": "2026-09-13",
+    "kind": "官方发布"
+  },
+  {
+    "id": "accelerator",
+    "title": "torch.accelerator",
+    "url": "https://docs.pytorch.org/docs/stable/accelerator.html",
+    "version": "PyTorch 2.14.0 基线",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "optim",
+    "title": "torch.optim",
+    "url": "https://docs.pytorch.org/docs/stable/optim.html",
+    "version": "PyTorch 2.14.0 基线",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "openstack",
+    "title": "OpenStack 概念架构",
+    "url": "https://docs.openstack.org/install-guide/get-started-conceptual-architecture.html",
+    "version": "概念文档",
+    "checked": "2026-09-13",
+    "kind": "官方文档"
+  },
+  {
+    "id": "schedule",
+    "title": "KubeCon China 2026 官方日程",
+    "url": "https://www.lfopensource.cn/kubecon-cloudnativecon-openinfra-summit-pytorch-conference-china/program/schedule/",
+    "version": "2026-09-08 至 09-09 参会材料",
+    "checked": "2026-09-13",
+    "kind": "会议资料"
+  },
+  {
+    "id": "vllm-otel",
+    "title": "vLLM 0.29.0 OpenTelemetry 示例",
+    "url": "https://github.com/vllm-project/vllm/blob/v0.29.0/examples/observability/opentelemetry/README.md",
+    "version": "0.29.0",
+    "checked": "2026-09-13",
+    "kind": "官方代码与发布"
+  },
+  {
+    "id": "otel-collector",
+    "title": "OpenTelemetry Collector Contrib 0.160.0",
+    "url": "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/tag/v0.160.0",
+    "version": "0.160.0",
+    "checked": "2026-09-13",
+    "kind": "官方代码与发布"
+  },
+  {
+    "id": "jaeger",
+    "title": "Jaeger 2.20.0",
+    "url": "https://github.com/jaegertracing/jaeger/releases/tag/v2.20.0",
+    "version": "2.20.0",
+    "checked": "2026-09-13",
+    "kind": "官方代码与发布"
+  }
+]

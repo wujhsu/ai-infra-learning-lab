@@ -1,0 +1,754 @@
+[
+  {
+    "id": "token",
+    "name": "Token",
+    "full": "词元",
+    "definition": "模型词表中的一个单位，输入时映射为整数 ID。它可能是一段文字、标点或字节片段。",
+    "example": "同一个汉字在不同分词器下不一定对应一个 token。",
+    "confused": "token 不等于汉字，也不等于单词。",
+    "lesson": "03-attention",
+    "aliases": [
+      "词元",
+      "分词"
+    ]
+  },
+  {
+    "id": "tensor",
+    "name": "Tensor",
+    "full": "张量",
+    "definition": "带形状和数据类型的多维数组，是模型计算和存储的基本单位。",
+    "example": "形状 [2,3] 的张量有两行三列，共 6 个元素。",
+    "confused": "张量形状不决定字节数，还要乘每元素字节数。",
+    "lesson": "03-attention",
+    "aliases": [
+      "张量",
+      "shape"
+    ]
+  },
+  {
+    "id": "attention",
+    "name": "Attention",
+    "full": "注意力机制",
+    "definition": "用查询 Q 与历史键 K 的匹配程度计算权重，再对值 V 加权求和。",
+    "example": "读到‘它’时，不同历史位置对当前表示的贡献不同。",
+    "confused": "注意力权重不是对人类推理过程的完整解释。",
+    "lesson": "03-attention",
+    "aliases": [
+      "注意力",
+      "QKV"
+    ]
+  },
+  {
+    "id": "prefill",
+    "name": "Prefill",
+    "full": "提示词预填充",
+    "definition": "处理当前输入前缀，构建各层的 K/V，并得到用于首次采样的输出。",
+    "example": "把 8,000 个输入 token 送入模型，通常可并行处理多个位置。",
+    "confused": "Prefill 不包含服务外所有排队和网络耗时。",
+    "lesson": "07-latency",
+    "aliases": [
+      "预填充"
+    ]
+  },
+  {
+    "id": "decode",
+    "name": "Decode",
+    "full": "逐步解码",
+    "definition": "基于已有上下文执行后续生成步骤；普通自回归路径每个序列每步产生一个新 token。",
+    "example": "上一步生成的 token 进入下一次模型前向计算。",
+    "confused": "推测解码可能一次接受多个 token；基础模型先不涉及它。",
+    "lesson": "07-latency",
+    "aliases": [
+      "解码"
+    ]
+  },
+  {
+    "id": "kv-cache",
+    "name": "KV Cache",
+    "full": "Key / Value Cache，键值缓存",
+    "definition": "保存历史 token 在各注意力层的 K/V，后续生成复用这些中间结果。",
+    "example": "第三轮对话复用相同前缀的缓存，省掉相应 Prefill 计算。",
+    "confused": "不是最终回答缓存；仍需读取历史 K/V 做注意力。",
+    "lesson": "09-kv-memory",
+    "aliases": [
+      "KVCache",
+      "键值缓存"
+    ]
+  },
+  {
+    "id": "ttft",
+    "name": "TTFT",
+    "full": "Time To First Token，首 token 延迟",
+    "definition": "从约定的请求起点，到观察到首个输出 token 的时间。必须明确客户端还是服务端口径。",
+    "example": "请求等待 8 秒、处理 6 秒，用户首 token 延迟不会只有 6 秒。",
+    "confused": "首个 SSE 消息可能只是角色信息，不是输出 token。",
+    "lesson": "07-latency",
+    "aliases": [
+      "首字延迟",
+      "首Token延迟"
+    ]
+  },
+  {
+    "id": "tpot",
+    "name": "TPOT",
+    "full": "Time Per Output Token，平均输出 token 时间",
+    "definition": "通常以首次输出之后的生成时间除以后续输出 token 数，衡量平均生成速度。",
+    "example": "首 token 后 9 个 token 用 0.45 秒，平均为 50 毫秒。",
+    "confused": "平均 TPOT 可能掩盖一次很长的停顿。",
+    "lesson": "07-latency",
+    "aliases": [
+      "平均输出延迟"
+    ]
+  },
+  {
+    "id": "itl",
+    "name": "ITL",
+    "full": "Inter-Token Latency，相邻 token 间隔",
+    "definition": "相邻输出 token 时间戳之差；分布反映流式输出的抖动。",
+    "example": "间隔 20、20、500 毫秒时，500 毫秒停顿值得单独调查。",
+    "confused": "网络 chunk 可包含多个 token，chunk 间隔不能直接冒充 ITL。",
+    "lesson": "07-latency",
+    "aliases": [
+      "token间隔"
+    ]
+  },
+  {
+    "id": "throughput",
+    "name": "Throughput",
+    "full": "吞吐量",
+    "definition": "单位时间完成的有效工作量，需要说明是请求还是输入/输出 token。",
+    "example": "每秒输出 1,000 token 是系统总吞吐，不代表每个用户都这么快。",
+    "confused": "高吞吐可能伴随较差的尾延迟。",
+    "lesson": "08-batching",
+    "aliases": [
+      "吞吐"
+    ]
+  },
+  {
+    "id": "slo",
+    "name": "SLO",
+    "full": "Service Level Objective，服务等级目标",
+    "definition": "在一个时间窗口内，对可测量的服务表现设定的目标。",
+    "example": "测试目标可写为 95% 请求 TTFT 小于 2 秒，并说明负载。",
+    "confused": "示例目标不是行业统一标准，也不等于合同 SLA。",
+    "lesson": "19-signals",
+    "aliases": [
+      "服务目标",
+      "尾延迟",
+      "p95"
+    ]
+  },
+  {
+    "id": "batch",
+    "name": "Continuous Batching",
+    "full": "连续批处理",
+    "definition": "推理引擎在执行步骤间让完成请求退出、新请求加入批次。",
+    "example": "短请求完成后，空出来的处理位置可以接纳另一个请求。",
+    "confused": "不是无限增加 batch；KV、算力和调度预算都有限。",
+    "lesson": "08-batching",
+    "aliases": [
+      "batch",
+      "连续批处理"
+    ]
+  },
+  {
+    "id": "gpu",
+    "name": "GPU",
+    "full": "Graphics Processing Unit，图形处理器",
+    "definition": "拥有大量并行执行单元的加速器，适合规则的数据并行计算。",
+    "example": "矩阵乘法可让许多线程同时处理不同输出块。",
+    "confused": "GPU 忙并不说明模型有效计算比例高。",
+    "lesson": "04-hardware",
+    "aliases": [
+      "显卡",
+      "加速器"
+    ]
+  },
+  {
+    "id": "hbm",
+    "name": "HBM",
+    "full": "High Bandwidth Memory，高带宽内存",
+    "definition": "一些数据中心 GPU 使用的设备侧内存，存放权重、激活、KV 等数据。",
+    "example": "权重和 KV 都需要占用 GPU 可用显存预算。",
+    "confused": "不是所有 GPU 都采用 HBM；寄存器和共享内存更靠近计算单元。",
+    "lesson": "04-hardware",
+    "aliases": [
+      "显存",
+      "高带宽内存"
+    ]
+  },
+  {
+    "id": "kernel",
+    "name": "Kernel",
+    "full": "GPU 核函数",
+    "definition": "由许多 GPU 线程并行执行的一段程序，通常由 CPU 发起或通过图执行。",
+    "example": "一次矩阵乘法可以由一个或多个 kernel 完成。",
+    "confused": "这里不是 Linux 内核。",
+    "lesson": "05-pytorch",
+    "aliases": [
+      "核函数",
+      "kernel launch"
+    ]
+  },
+  {
+    "id": "bandwidth",
+    "name": "Bandwidth",
+    "full": "带宽",
+    "definition": "单位时间能够传输的数据量，例如 GB/s。",
+    "example": "搬 8 GB 数据，以有效 80 GB/s 传输，理想传输时间为 0.1 秒。",
+    "confused": "带宽不同于一次小传输的启动延迟。",
+    "lesson": "04-hardware",
+    "aliases": [
+      "带宽"
+    ]
+  },
+  {
+    "id": "roofline",
+    "name": "Roofline",
+    "full": "屋顶线性能模型",
+    "definition": "用计算峰值和内存带宽约束估计性能上限，关键量是每字节执行多少运算。",
+    "example": "运算量不变却减少内存读写，可能让算子远离带宽瓶颈。",
+    "confused": "理论上限不是性能承诺，需要有效带宽和准确流量统计。",
+    "lesson": "04-hardware",
+    "aliases": [
+      "屋顶线",
+      "操作强度"
+    ]
+  },
+  {
+    "id": "pod",
+    "name": "Pod",
+    "full": "Kubernetes 最小调度单元",
+    "definition": "共同调度的一组容器，共享网络身份，并可共享存储卷。",
+    "example": "应用容器与日志 sidecar 可以位于同一个 Pod。",
+    "confused": "Pod 不是虚拟机，也不是稳定不变的服务器。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "容器组"
+    ]
+  },
+  {
+    "id": "controller",
+    "name": "Controller",
+    "full": "控制器",
+    "definition": "持续观察实际状态，并执行操作使其接近期望状态的控制循环。",
+    "example": "期望有两个副本，少一个时控制器创建新的 Pod。",
+    "confused": "控制器通常不处理每一个推理请求。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "控制器",
+      "reconciliation"
+    ]
+  },
+  {
+    "id": "rank",
+    "name": "Rank",
+    "full": "通信参与者编号",
+    "definition": "通信组中某个参与进程的标识，范围通常为 0 到 world size 减一。",
+    "example": "4 个进程的 rank 可以是 0、1、2、3。",
+    "confused": "rank 不天然等于节点编号，常见配置是一进程一 GPU。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "world size"
+    ]
+  },
+  {
+    "id": "nccl",
+    "name": "NCCL",
+    "full": "NVIDIA Collective Communications Library",
+    "definition": "用于 NVIDIA GPU 间集合通信和点对点通信的库。",
+    "example": "数据并行训练通过 AllReduce 汇总梯度。",
+    "confused": "不是模型分片策略本身；上层决定什么时候通信什么。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "集合通信"
+    ]
+  },
+  {
+    "id": "allreduce",
+    "name": "AllReduce",
+    "full": "全归约",
+    "definition": "把所有参与者的数组按指定运算归约，并让每个参与者得到结果。",
+    "example": "两卡分别有 [1,2] 和 [3,4]，求和后两卡都获得 [4,6]。",
+    "confused": "AllGather 是收集拼接，不会自动求和。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "全归约"
+    ]
+  },
+  {
+    "id": "tp",
+    "name": "TP",
+    "full": "Tensor Parallelism，张量并行",
+    "definition": "将同一层的张量计算拆到多个设备上，按分片方式交换中间结果。",
+    "example": "把一个线性层权重按输出维度分列。",
+    "confused": "TP 需要层内通信；不等于复制整个模型。",
+    "lesson": "13-parallelism",
+    "aliases": [
+      "张量并行"
+    ]
+  },
+  {
+    "id": "pp",
+    "name": "PP",
+    "full": "Pipeline Parallelism，流水线并行",
+    "definition": "将模型不同层放在不同设备阶段，阶段之间传递激活。",
+    "example": "前一组 GPU 执行前半层，后一组执行后半层。",
+    "confused": "流水线空泡会影响利用率。",
+    "lesson": "13-parallelism",
+    "aliases": [
+      "流水线并行"
+    ]
+  },
+  {
+    "id": "dp",
+    "name": "DP",
+    "full": "Data Parallelism，数据并行",
+    "definition": "多个模型副本处理不同数据；训练还要同步梯度，推理副本通常独立处理请求。",
+    "example": "两份推理模型分别服务不同请求。",
+    "confused": "训练 DP 与推理副本的同步需求不同。",
+    "lesson": "13-parallelism",
+    "aliases": [
+      "数据并行"
+    ]
+  },
+  {
+    "id": "ep",
+    "name": "EP",
+    "full": "Expert Parallelism，专家并行",
+    "definition": "将 MoE 的专家放到不同设备，token 按路由结果发送给选中的专家。",
+    "example": "token 的输入被 dispatch 到专家所在 GPU，再 combine 输出。",
+    "confused": "一个 token 不一定经过所有专家。",
+    "lesson": "13-parallelism",
+    "aliases": [
+      "专家并行",
+      "MoE"
+    ]
+  },
+  {
+    "id": "numa",
+    "name": "NUMA",
+    "full": "Non-Uniform Memory Access，非一致内存访问",
+    "definition": "CPU 访问本地与远端内存/设备时路径和代价不同的拓扑。",
+    "example": "GPU 和 NIC 靠近同一 CPU 插槽可能减少跨插槽传输。",
+    "confused": "NUMA 相同不保证所有路径性能完全相同。",
+    "lesson": "16-gpu-scheduling",
+    "aliases": [
+      "拓扑",
+      "亲和性"
+    ]
+  },
+  {
+    "id": "rdma",
+    "name": "RDMA",
+    "full": "Remote Direct Memory Access，远程直接内存访问",
+    "definition": "允许网卡参与跨机器内存传输、减少 CPU 介入的一组机制。",
+    "example": "多节点 GPU 通信可使用支持 RDMA 的网络路径。",
+    "confused": "存在 RDMA 网卡不代表 GPU Direct 路径已生效。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "远程直接内存访问",
+      "NIC"
+    ]
+  },
+  {
+    "id": "lsa",
+    "name": "LSA",
+    "full": "Load/Store Accessible",
+    "definition": "NCCL Device API 中能以加载/存储访问的对端内存路径，要求相应 P2P 能力。",
+    "example": "通过对端 window offset 取得可访问指针。",
+    "confused": "不只等于 NVLink，也不保证任意 PCIe GPU 都可用。",
+    "lesson": "15-nccl",
+    "aliases": [
+      "P2P"
+    ]
+  },
+  {
+    "id": "gin",
+    "name": "GIN",
+    "full": "GPU-Initiated Networking",
+    "definition": "GPU kernel 发起网络通信的 NCCL Device API 能力。",
+    "example": "发送数据后使用 signal 与等待机制交接数据可用性。",
+    "confused": "本地发起或完成不等于远端已经可以消费。",
+    "lesson": "15-nccl",
+    "aliases": [
+      "设备发起通信"
+    ]
+  },
+  {
+    "id": "dra",
+    "name": "DRA",
+    "full": "Dynamic Resource Allocation，动态资源分配",
+    "definition": "Kubernetes 用结构化设备库存和资源声明进行分配、准备与状态管理的机制。",
+    "example": "请求具备特定属性的 GPU，并约束与 NIC 的拓扑。",
+    "confused": "不是旧 Device Plugin 的简单改名。",
+    "lesson": "17-dra",
+    "aliases": [
+      "动态资源分配"
+    ]
+  },
+  {
+    "id": "claim",
+    "name": "ResourceClaim",
+    "full": "资源声明",
+    "definition": "DRA 中描述设备请求并承载分配结果的对象，Pod 可以引用它。",
+    "example": "请求一个符合 DeviceClass 规则的设备。",
+    "confused": "创建 Claim 不代表设备已经完成节点准备。",
+    "lesson": "17-dra",
+    "aliases": [
+      "资源声明",
+      "DeviceClass",
+      "ResourceSlice"
+    ]
+  },
+  {
+    "id": "lws",
+    "name": "LWS",
+    "full": "LeaderWorkerSet",
+    "definition": "管理 leader 与 worker Pod 工作组的 Kubernetes 扩展 API。",
+    "example": "一个模型副本由 leader 与多个 worker 协作提供服务。",
+    "confused": "LWS 不自动证明 NCCL 网络健康，也不自动选择所有并行参数。",
+    "lesson": "18-lws",
+    "aliases": [
+      "LeaderWorkerSet",
+      "工作组"
+    ]
+  },
+  {
+    "id": "trace",
+    "name": "Trace",
+    "full": "分布式追踪",
+    "definition": "由相关 span 组成的一次执行链路，描述操作时序和父子关系。",
+    "example": "网关与推理引擎传播 trace context 后可以关联阶段。",
+    "confused": "共享 GPU 上的利用率不能直接当成某一请求的专属消耗。",
+    "lesson": "20-correlation",
+    "aliases": [
+      "追踪",
+      "span",
+      "TraceID"
+    ]
+  },
+  {
+    "id": "canary",
+    "name": "Canary",
+    "full": "金丝雀发布",
+    "definition": "先让少量流量进入新版本，用观察结果决定继续、暂停或回滚。",
+    "example": "新版本先接收 10% 请求，检测异常后停止放量。",
+    "confused": "10% 副本不一定意味着精确 10% 流量，需要路由支持。",
+    "lesson": "22-canary",
+    "aliases": [
+      "灰度发布",
+      "金丝雀"
+    ]
+  },
+  {
+    "id": "gitops",
+    "name": "GitOps",
+    "full": "Git 中的声明式交付",
+    "definition": "把期望配置保存在版本控制中，由控制器协调集群与声明的一致性。",
+    "example": "修复通过 PR、审核和合并改变声明，再由控制器部署。",
+    "confused": "直接改集群可能被协调回 Git 中状态。",
+    "lesson": "23-agent-repair",
+    "aliases": [
+      "渐进交付"
+    ]
+  },
+  {
+    "id": "container",
+    "name": "Container",
+    "full": "Container，容器",
+    "definition": "用操作系统隔离和资源限制来运行应用进程的环境，通常共享宿主内核。",
+    "example": "同一个镜像可以在两台机器上启动两个独立容器。",
+    "confused": "镜像是模板，容器是运行实例；容器不是一台独立内核的虚拟机。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "容器"
+    ]
+  },
+  {
+    "id": "image",
+    "name": "Image",
+    "full": "Container Image，容器镜像",
+    "definition": "包含应用文件、依赖与启动配置的可分发模板。",
+    "example": "固定 image@sha256 可以明确本次实验使用哪个镜像内容。",
+    "confused": "标签可以变化，digest 指向内容；模型权重不一定包含在镜像里。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "镜像",
+      "digest"
+    ]
+  },
+  {
+    "id": "node",
+    "name": "Node",
+    "full": "Kubernetes Node，节点",
+    "definition": "承载 Pod 的工作机器，可以是物理机或虚拟机。",
+    "example": "一台配有 8 张 GPU 的机器可以作为一个 Kubernetes 节点。",
+    "confused": "节点不等于 Pod，也不等于单张 GPU。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "节点"
+    ]
+  },
+  {
+    "id": "deployment",
+    "name": "Deployment",
+    "full": "Deployment，部署控制器",
+    "definition": "管理一组副本 Pod 的期望状态，并支持模板变更后的滚动更新。",
+    "example": "期望 3 个服务副本，一个退出后控制器创建替代实例。",
+    "confused": "普通副本控制不自动提供 LWS 的整组推理启动语义。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "部署控制器"
+    ]
+  },
+  {
+    "id": "service",
+    "name": "Service",
+    "full": "Kubernetes Service，服务",
+    "definition": "为一组后端提供相对稳定的访问入口，通过选择器等关联端点。",
+    "example": "客户端访问服务名，由集群把请求送到符合条件的后端。",
+    "confused": "Service 不是实际执行推理的进程；就绪端点也不保证业务延迟达标。",
+    "lesson": "02-kubernetes",
+    "aliases": [
+      "服务",
+      "服务发现"
+    ]
+  },
+  {
+    "id": "namespace",
+    "name": "Namespace",
+    "full": "Namespace，命名空间",
+    "definition": "在同一个集群中为名称和资源管理提供逻辑范围。",
+    "example": "把可删除的实验对象放在 inference-lab 中，方便集中查看。",
+    "confused": "命名空间不是完整安全隔离；删除它会删除其中资源。",
+    "lesson": "16-gpu-scheduling",
+    "aliases": [
+      "命名空间"
+    ]
+  },
+  {
+    "id": "dtype",
+    "name": "dtype",
+    "full": "Data Type，数据类型",
+    "definition": "决定张量元素的表示方式、精度范围和字节占用。",
+    "example": "FP32 元素通常 4 字节，BF16 和 FP16 通常 2 字节。",
+    "confused": "相同字节数不代表相同数值范围或精度。",
+    "lesson": "03-attention",
+    "aliases": [
+      "数据类型",
+      "精度"
+    ]
+  },
+  {
+    "id": "gqa",
+    "name": "GQA",
+    "full": "Grouped-Query Attention，分组查询注意力",
+    "definition": "让多组 Query heads 共享较少的 Key/Value heads 的注意力结构。",
+    "example": "32 个查询头、8 个 KV 头时，缓存公式用 8 个 KV 头。",
+    "confused": "不能把查询头数量直接代入所有模型的 KV 容量公式。",
+    "lesson": "09-kv-memory",
+    "aliases": [
+      "分组查询注意力",
+      "KV heads"
+    ]
+  },
+  {
+    "id": "moe",
+    "name": "MoE",
+    "full": "Mixture of Experts，混合专家",
+    "definition": "通过路由为每个输入选择部分专家网络参与计算的模型结构。",
+    "example": "某个 token 只经过选中的两个专家，而非所有专家。",
+    "confused": "稀疏激活不意味着没有通信成本；专家分布可能导致负载不均。",
+    "lesson": "13-parallelism",
+    "aliases": [
+      "混合专家"
+    ]
+  },
+  {
+    "id": "pcie",
+    "name": "PCIe",
+    "full": "Peripheral Component Interconnect Express，高速设备互连",
+    "definition": "连接 CPU 与外设等组件的一类互连技术。",
+    "example": "CPU 主存中的数据通过一条支持的路径搬到 GPU。",
+    "confused": "接口代际和链路宽度影响带宽；标称双向总带宽不是单次传输的有效带宽。",
+    "lesson": "04-hardware",
+    "aliases": [
+      "PCI Express"
+    ]
+  },
+  {
+    "id": "nvlink",
+    "name": "NVLink",
+    "full": "NVIDIA NVLink，高带宽互连",
+    "definition": "NVIDIA 的高速互连技术，常见于特定 GPU 间以及支持的平台中。",
+    "example": "支持的多 GPU 平台可能通过 NVLink 交换数据。",
+    "confused": "并不是所有 GPU 对、服务器或 NIC 都直接通过 NVLink 相连。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "高速互连"
+    ]
+  },
+  {
+    "id": "nic",
+    "name": "NIC",
+    "full": "Network Interface Controller，网络接口控制器",
+    "definition": "让机器接入网络的设备，通常称网卡。",
+    "example": "跨主机的 GPU 通信可能经过各自的 NIC 和网络交换机。",
+    "confused": "网卡能力与端到端实际带宽不同，还受拓扑、协议和共享负载影响。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "网卡"
+    ]
+  },
+  {
+    "id": "sm",
+    "name": "SM",
+    "full": "Streaming Multiprocessor，流式多处理器",
+    "definition": "NVIDIA GPU 中调度和执行线程块的计算单元。",
+    "example": "一个 kernel 的许多线程块分布到多个 SM 上执行。",
+    "confused": "SM 不是整张 GPU，也不能仅凭 SM 数推断应用速度。",
+    "lesson": "05-pytorch",
+    "aliases": [
+      "流式多处理器"
+    ]
+  },
+  {
+    "id": "stream",
+    "name": "CUDA Stream",
+    "full": "CUDA Stream，CUDA 执行流",
+    "definition": "按序提交设备操作的队列；不同流之间可以有并行机会。",
+    "example": "计算流等待一个事件后再读取通信流写入的数据。",
+    "confused": "不同 stream 不自动保证并行，也不会自动消除数据依赖。",
+    "lesson": "15-nccl",
+    "aliases": [
+      "执行流",
+      "事件"
+    ]
+  },
+  {
+    "id": "allgather",
+    "name": "AllGather",
+    "full": "AllGather，全收集",
+    "definition": "每个 rank 贡献自己的数据片段，最终每个 rank 都获得所有片段。",
+    "example": "rank 0 有 A、rank 1 有 B，结束后两者都有 A 和 B。",
+    "confused": "它进行收集，不做求和等归约运算。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "全收集"
+    ]
+  },
+  {
+    "id": "reducescatter",
+    "name": "ReduceScatter",
+    "full": "ReduceScatter，归约后分散",
+    "definition": "先对对应位置归约，再把归约结果的不同片段分给各个 rank。",
+    "example": "两个 rank 对向量求和后，各自保留结果的一半。",
+    "confused": "单个 rank 不会像 AllReduce 那样得到整个归约结果。",
+    "lesson": "14-collectives",
+    "aliases": [
+      "归约分散"
+    ]
+  },
+  {
+    "id": "barrier",
+    "name": "Barrier",
+    "full": "Barrier，屏障同步",
+    "definition": "要求一组参与者到达约定位置后，才允许按规则继续。",
+    "example": "所有 rank 完成某一准备阶段后，再进入下一阶段。",
+    "confused": "控制流到达屏障与数据可见性需要结合具体 API 语义，不可随意互换。",
+    "lesson": "15-nccl",
+    "aliases": [
+      "屏障",
+      "同步"
+    ]
+  },
+  {
+    "id": "resourceslice",
+    "name": "ResourceSlice",
+    "full": "ResourceSlice，设备库存切片",
+    "definition": "DRA 驱动发布设备信息的 Kubernetes 资源；多个切片可共同描述库存。",
+    "example": "某个驱动声明节点上有两张具备特定属性的 GPU。",
+    "confused": "库存记录不是某个 Pod 的分配凭证。",
+    "lesson": "17-dra",
+    "aliases": [
+      "资源切片",
+      "设备库存"
+    ]
+  },
+  {
+    "id": "deviceclass",
+    "name": "DeviceClass",
+    "full": "DeviceClass，设备类",
+    "definition": "DRA 中用于描述选择设备规则的集群级资源。",
+    "example": "管理员定义一个设备类，使请求可以选择合适驱动的设备。",
+    "confused": "实际属性名由驱动定义，不能从某个演示名字推断所有驱动都支持。",
+    "lesson": "17-dra",
+    "aliases": [
+      "设备类"
+    ]
+  },
+  {
+    "id": "cdi",
+    "name": "CDI",
+    "full": "Container Device Interface，容器设备接口",
+    "definition": "用规范化配置描述向容器注入设备访问所需信息的接口。",
+    "example": "设备驱动准备完成后，运行时可使用 CDI 配置提供设备节点等资源。",
+    "confused": "分配设备、准备设备与容器可用属于不同步骤。",
+    "lesson": "17-dra",
+    "aliases": [
+      "容器设备接口"
+    ]
+  },
+  {
+    "id": "metric",
+    "name": "Metric",
+    "full": "Metric，指标",
+    "definition": "按时间记录的数值测量，适合汇总系统行为。",
+    "example": "请求延迟直方图帮助观察一段时间内的分布。",
+    "confused": "给每个 request ID 建标签会制造高基数，不适合常规聚合指标。",
+    "lesson": "19-signals",
+    "aliases": [
+      "指标",
+      "高基数"
+    ]
+  },
+  {
+    "id": "span",
+    "name": "Span",
+    "full": "Span，追踪跨度",
+    "definition": "Trace 中表示一段操作及其起止时间、属性和父子关联的记录。",
+    "example": "gateway span 可以关联同一请求的引擎处理 span。",
+    "confused": "一个 span 不是一条 GPU 指令，也不天然解释所有时间空隙。",
+    "lesson": "20-correlation",
+    "aliases": [
+      "追踪跨度"
+    ]
+  },
+  {
+    "id": "sse",
+    "name": "SSE",
+    "full": "Server-Sent Events，服务器发送事件",
+    "definition": "服务器通过持续 HTTP 响应向客户端发送事件的格式与机制。",
+    "example": "流式模型接口用多个 data 事件逐步返回回答。",
+    "confused": "一个事件可以没有文本，也可以包含多个 token；chunk 间隔不等于 token 间隔。",
+    "lesson": "07-latency",
+    "aliases": [
+      "流式事件",
+      "Server-Sent Events"
+    ]
+  },
+  {
+    "id": "keps",
+    "name": "KEP",
+    "full": "Kubernetes Enhancement Proposal，Kubernetes 增强提案",
+    "definition": "用于描述设计动机、方案和演进计划的上游提案。",
+    "example": "DRA 某项能力在 KEP 中讨论，不代表你的集群版本已经启用。",
+    "confused": "提案合并、代码合并、正式发布和默认开启是不同状态。",
+    "lesson": "17-dra",
+    "aliases": [
+      "KEP",
+      "增强提案"
+    ]
+  }
+]
