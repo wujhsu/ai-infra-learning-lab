@@ -27,3 +27,7 @@ GPU / CUDA 性能基准、真实 vLLM 模型服务、跨节点 NCCL、Kubernetes
 ## 持续验证
 
 GitHub Actions 在干净的 Ubuntu / Node 24 环境执行类型检查、逻辑测试、CPU 实验、静态构建、资源校验，再发布 Pages。发布后的深链接、图片、搜索与刷新另行做在线检查。
+
+## 首次在线验证
+
+GitHub Actions 在 Ubuntu 上完成全部构建与测试，Pages 成功发布。在线检查首页、TTFT / DRA 章节、NCCL 专题、LWS 实验、讲义图片、搜索脚本和实验 ZIP 均返回 HTTP 200。首次运行的 build 成功、deploy 因新仓库 Pages 尚未启用而失败；启用 workflow Pages 后重发成功，未绕过任何测试。
