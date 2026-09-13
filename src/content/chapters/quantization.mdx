@@ -61,12 +61,12 @@ W 表示权重，A 表示激活；W4A16 表示权重以 4 位形式存储或参�
 
 低位权重可能在执行前解包，或者通过融合 kernel 边读取边解量化。若当前 GPU、形状和后端没有合适 kernel，节省显存也可能付出更多计算时间。真实支持需要检查引擎版本、GPU 架构、量化格式和模型结构四者的组合。[vLLM 支持矩阵](https://docs.vllm.ai/en/latest/features/quantization/)
 
-<details>
-<summary>FP16、BF16、FP8 与整数是不是一回事？</summary>
+<aside class="concept-note">
+<strong>关键区别：FP16、BF16、FP8 与整数是不是一回事？</strong>
 
 浮点数用指数和有效数字覆盖不同数量级；整数加尺度是在一个量化区间内映射。BF16 与 FP16 都是 16 位，但指数与有效数字分配不同。FP8 也有不同格式。位数相同不意味着动态范围、误差或硬件执行相同，比较时必须写完整格式。
 
-</details>
+</aside>
 
 ## 为什么 KV 量化要单独检查
 

@@ -51,12 +51,12 @@ import {asset} from '../../data/curriculum';
 
 LWS 提供重启策略，具体取值和行为应查安装版本。不能把 Pod 自身的 `restartPolicy` 与 LWS 的工作组重建策略混为一谈。[LWS 失败处理](https://lws.sigs.k8s.io/docs/concepts/failure-handling/)
 
-<details>
-<summary>为什么无限重启不是自愈？</summary>
+<aside class="concept-note">
+<strong>关键边界：为什么无限重启不是自愈？</strong>
 
 如果每次都是相同的镜像错误、模型文件缺失或坏设备，重启只重复失败。可靠流程需要收集证据、限制重试、区分瞬时与持久故障，必要时隔离设备或回退版本。只有故障原因被消除且服务检查通过，才算恢复。
 
-</details>
+</aside>
 
 ## 工作组与流量发布分别由谁控制
 

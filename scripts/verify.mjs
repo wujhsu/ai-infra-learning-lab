@@ -47,5 +47,30 @@ for(const file of htmls){const html=read(file);
   if(hash&&target.endsWith('.html')){let ids=idCache.get(target);if(!ids){ids=new Set([...read(target).matchAll(/id="([^"]+)"/g)].map(m=>m[1]));idCache.set(target,ids);}assert(ids.has(decodeURIComponent(hash)),`Missing anchor ${url}`);}
  }
 }
+for(const [position,item] of reading.entries()){
+ const html=read(`dist/read/${item.id}/index.html`),stage=`stage-${item.stage}`;
+ assert(html.includes('class="reader-crumbs" aria-label="面包屑"'),`${item.id}: missing breadcrumbs`);
+ assert(html.includes(`href="${base}path/#${stage}"`),`${item.id}: missing stage breadcrumb`);
+ assert(html.includes(`aria-current="page">第 ${position+1} 章`),`${item.id}: incorrect chapter position`);
+ assert(html.includes('class="reader-switcher"'),`${item.id}: missing sticky switcher`);
+ assert(html.includes('id="reader-nav-dialog"'),`${item.id}: missing chapter picker`);
+ assert(html.includes('<details class="reader-toc" open>'),`${item.id}: roadmap is not open by default`);
+ assert(html.includes('class="reader-menu-fallback"'),`${item.id}: missing no-JavaScript navigation fallback`);
+ assert(html.includes('data-menu-current="true"'),`${item.id}: current chapter is not marked in picker`);
+ const previous=reading[position-1];if(previous)assert(html.includes(`href="${base}read/${previous.id}/" aria-label="上一章`),`${item.id}: missing previous chapter`);
+ const next=reading[position+1];assert(html.includes(`href="${base}${next?`read/${next.id}/`:'projects/'}" aria-label="下一步`),`${item.id}: missing next destination`);
+}
+for(const col of ['projects','code','advanced']){
+ const entries=walk(`src/content/${col}`).filter(file=>file.endsWith('.mdx')).map(file=>{const content=read(file),fm=content.split('---')[1];return{id:path.basename(file,'.mdx'),order:Number(fm.match(/^order: (\d+)$/m)?.[1])};}).sort((a,b)=>a.order-b.order);
+ for(const [position,item] of entries.entries()){
+  const html=read(`dist/${col}/${item.id}/index.html`);
+  assert(html.includes('class="reader-crumbs" aria-label="面包屑"'),`${col}/${item.id}: missing breadcrumbs`);
+  assert(html.includes('<details class="reader-toc" open>'),`${col}/${item.id}: roadmap is not open by default`);
+  assert(html.includes('data-menu-current="true"'),`${col}/${item.id}: current item is not marked in picker`);
+  const previous=entries[position-1],next=entries[position+1];
+  if(previous)assert(html.includes(`href="${base}${col}/${previous.id}/" aria-label="上一篇`),`${col}/${item.id}: missing previous item`);
+  if(next)assert(html.includes(`href="${base}${col}/${next.id}/" aria-label="下一步`),`${col}/${item.id}: missing next item`);
+ }
+}
 assert(existsSync('dist/pagefind/pagefind.js'));assert(existsSync('dist/downloads/labs.zip'));
 console.log(`Verified ${chapters} learning entries, ${slides.length} slide pages, ${htmls.length} HTML pages and ${links} internal links/assets. No private-minute paths in published HTML.`);

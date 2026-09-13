@@ -46,8 +46,8 @@ import {asset} from '../../data/curriculum';
 
 从有限小步近似来看：`(3.9204−4)/0.01 = −7.96`。步长足够小时，这个变化率靠近 −8。负号表示在当前点稍微增大 w，损失倾向下降。
 
-<details>
-<summary>不用记规则，也能看懂这个导数怎样得到</summary>
+<aside class="concept-note">
+<strong>不用记规则，也能看懂这个导数怎样得到</strong>
 
 
 令 y=wx，L=(y−t)²。L 对 y 的变化率为 `2(y−t)`；y 对 w 的变化率为 x。两段影响连起来，得到 `dL/dw=2(y−t)x`。
@@ -55,7 +55,7 @@ import {asset} from '../../data/curriculum';
 代入 x=2、t=6、w=2：`2×(4−6)×2=−8`。把沿途变化率相乘叫链式法则。它回答“参数先影响中间值，中间值再影响损失，总影响怎样组合”。
 
 
-</details>
+</aside>
 
 ## 有了梯度，再决定走多远
 

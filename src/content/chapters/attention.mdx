@@ -121,8 +121,8 @@ import {asset} from '../../data/curriculum';
 
 现在可以把三种对象严格分开：K 用于计算分数，Softmax 产生位置权重，V 用于汇总。位置权重也不是第一章那组候选 token 概率；二者都可能使用 Softmax，但所归一化的对象不同。
 
-<details>
-<summary>把刚才的步骤放回公式</summary>
+<aside class="concept-note">
+<strong>把刚才的步骤放回公式</strong>
 
 
 $$\mathrm{Attention}(q,K,V)=\mathrm{softmax}\left(\frac{qK^T}{\sqrt d}\right)V$$
@@ -132,7 +132,7 @@ $$\mathrm{Attention}(q,K,V)=\mathrm{softmax}\left(\frac{qK^T}{\sqrt d}\right)V$$
 Softmax 不改变形状，只把这行分数归一化。最终 `[1,2]` 的权重乘 `[2,2]` 的 V，得到 `[1,2]` 的输出向量。公式中的 d 是 Q/K 的分量数，不是位置数。
 
 
-</details>
+</aside>
 
 <span id="mask"></span>
 ## 一次处理整段文字，怎样保证不偷看答案？
