@@ -47,6 +47,8 @@
 
 2026-09-13 已将 `d3b4449` 使用 GitHub Actions 干净构建并部署至现有 GitHub Pages。[构建与部署记录](https://github.com/wujhsu/ai-infra-learning-lab/actions/runs/34753120069)。Linux CI 也实际执行通过 TypeScript/Python 测试、双进程 CPU DDP 与 DCP 恢复检查。
 
+阅读导航版本也已完成独立的 Linux 构建、测试与部署。[阅读导航构建与部署记录](https://github.com/wujhsu/ai-infra-learning-lab/actions/runs/34757825524)。线上手机视口复核确认第 1 章与第 32 章的面包屑、默认展开路标、当前阶段选择器和相邻章节入口正确；KV 演示直接显示默认结果且页面无横向溢出。
+
 部署后实际验证：
 
 - 首页、生成/Attention/DRA 章节、极小模型项目、vLLM 源码阅读均返回 HTTP 200。
