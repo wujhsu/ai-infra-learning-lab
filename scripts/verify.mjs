@@ -70,6 +70,17 @@ for(const file of htmls){const html=read(file);
   if(hash&&target.endsWith('.html')){let ids=idCache.get(target);if(!ids){ids=new Set([...read(target).matchAll(/id="([^"]+)"/g)].map(m=>m[1]));idCache.set(target,ids);}assert(ids.has(decodeURIComponent(hash)),`Missing anchor ${url}`);}
  }
 }
+const anchorIds=file=>new Set([...read(file).matchAll(/id="([^"]+)"/g)].map(m=>m[1]));
+const glossary=json('src/data/glossary.json');
+for(const c of concepts){
+ if(!c.anchor)continue;
+ const file=`dist/read/${c.firstChapter}/index.html`;
+ assert(anchorIds(file).has(c.anchor),`concept ${c.id}: anchor #${c.anchor} missing in ${c.firstChapter}`);
+}
+for(const t of glossary){
+ const m=t.path.match(/^read\/([a-z0-9-]+)\/$/);
+ if(m&&t.anchor)assert(anchorIds(`dist/read/${m[1]}/index.html`).has(t.anchor),`glossary ${t.id}: anchor #${t.anchor} missing in ${m[1]}`);
+}
 for(const [position,item] of reading.entries()){
  const html=read(`dist/read/${item.id}/index.html`),project=chapterProject.get(item.id);
  assert(html.includes('class="reader-crumbs" aria-label="面包屑"'),`${item.id}: missing breadcrumbs`);
