@@ -66,3 +66,11 @@ test('old curriculum progress is never imported into this library',()=>{
  const s=emptyStore();s.records['terms/token']={...emptyEntry(),review:true};
  assert.equal(validateStore(s).records['terms/token'].review,true);
 });
+
+test('theme auto is stored, importable, and invalid values fall back to light',()=>{
+ const s=emptyStore();
+ assert.equal(s.settings.theme,'auto');
+ assert.equal(validateStore(s).settings.theme,'auto');
+ s.settings.theme='sepia' as typeof s.settings.theme;
+ assert.equal(validateStore(s).settings.theme,'light');
+});

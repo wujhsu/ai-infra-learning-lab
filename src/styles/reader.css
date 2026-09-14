@@ -228,18 +228,58 @@ h4 {
   justify-self: end;
 }
 
-.reader-toc,
-.reader-toc[open] {
-  position: static;
-  width: auto;
-  max-height: none;
-  margin: 18px 0 30px;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  font-size: 13px;
+@media (max-width: 1359px) {
+  .reader-toc,
+  .reader-toc[open] {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin: 18px 0 30px;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    font-size: 13px;
+  }
+}
+
+/* ≥1360px：本章路标固定为左侧栏。
+   断点依据：正文栏 calc(38 × --reading-size + 48px) 在 22px 字号下 884px，
+   190px 侧栏 + 间距需要 vw ≥ 1352 才不与正文重叠。 */
+@media (min-width: 1360px) {
+  .reader-toc[open] {
+    position: fixed;
+    left: max(20px, calc(50vw - 660px));
+    top: 110px;
+    width: 190px;
+    max-height: calc(100dvh - 140px);
+    margin: 0;
+    padding: 10px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    font-size: 12px;
+  }
+
+  .reader-toc:not([open]) {
+    width: max-content;
+  }
+
+  .reader-toc[open] > summary {
+    min-height: 36px;
+    padding: 2px 4px;
+  }
+
+  .reader-toc[open] nav {
+    padding: 0;
+  }
+
+  .reader-toc[open] a {
+    min-height: 36px;
+    padding: 4px 6px;
+  }
 }
 
 .reader-toc > summary {
@@ -255,6 +295,16 @@ h4 {
 
 .reader-toc > summary small {
   font-weight: 400;
+}
+
+.reader-toc > summary::after {
+  color: var(--muted);
+  content: '▾';
+  font-size: 11px;
+}
+
+.reader-toc[open] > summary::after {
+  content: '▴';
 }
 
 .reader-toc nav {
@@ -320,7 +370,7 @@ h4 {
   padding: 14px 16px;
   border-left: 3px solid var(--teal);
   background: var(--soft);
-  color: var(--muted);
+  color: var(--ink);
   font-size: 13px;
 }
 
@@ -390,7 +440,11 @@ h4 {
 
   .reader-toc,
   .reader-toc[open] {
+    position: sticky;
+    top: 56px;
+    z-index: 30;
     margin: 14px 0 26px;
+    background: var(--bg);
   }
 
   .reader-nav-dialog {
@@ -409,5 +463,59 @@ h4 {
 
   .prerequisite-note ul {
     display: block;
+  }
+}
+
+/* 站点移动导航（汉堡菜单）。样式放在 reader.css：它与 reader.css 一样经 Base.astro 全站加载。 */
+.nav-toggle {
+  display: none;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: var(--teal);
+  font-size: 14px;
+}
+
+.site-nav-dialog {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-height: 82dvh;
+  margin: 0;
+  padding: 24px 20px max(22px, env(safe-area-inset-bottom));
+  border-radius: 14px 14px 0 0;
+}
+
+.site-nav-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.site-nav-dialog nav {
+  display: grid;
+}
+
+.site-nav-dialog nav a {
+  min-height: 48px;
+  padding: 12px 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.site-nav-dialog nav a.active {
+  color: var(--teal);
+}
+
+@media (max-width: 760px) {
+  .js .header nav {
+    display: none;
+  }
+
+  .js .nav-toggle {
+    display: inline-flex;
+    align-items: center;
   }
 }
