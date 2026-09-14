@@ -42,7 +42,7 @@ import {asset} from '../../data/curriculum';
 
 在项目三的固定数据基线上，给两个微批次做梯度累积。前一个微批次把 forward 与 backward 都放在 `no_sync()` 范围内，最后一个恢复同步；按同一全局损失规则缩放。再与一次全局批次更新比较参数。
 
-若只把 backward 放进 no_sync，而 forward 在外面，不能默认实现仍符合预期。API 的上下文边界是阅读任务的一部分。[DDP 文档](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html)
+若只把 backward 放进 `no_sync`，而 forward 在外面，不能默认实现仍符合预期。API 的上下文边界是阅读任务的一部分。[DDP 文档](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html)
 
 ## 追一次不对称执行
 
