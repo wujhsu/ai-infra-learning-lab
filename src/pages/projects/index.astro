@@ -1,5 +1,6 @@
 ---
-import {getCollection} from 'astro:content';import Base from '../../layouts/Base.astro';import {asset} from '../../data/curriculum';
+import {getCollection} from 'astro:content';import Base from '../../layouts/Base.astro';import {asset,reading,projects} from '../../data/curriculum';
 const entries=(await getCollection('projects')).sort((a,b)=>a.data.order-b.data.order);
+const span=(id:string)=>{const p=projects.find(x=>x.id===id)!;const first=reading.find(x=>x.id===p.chapters[0])!.order,last=reading.find(x=>x.id===p.chapters[p.chapters.length-1])!.order;return first===last?`第 ${first} 章`:`第 ${first}–${last} 章`;};
 ---
-<Base title="实践项目" active="projects/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">AI Infra 系统学习库</span><h1>实践项目</h1><p>先掌握关联章节的机制，再带着一个明确问题深入。环境与验证状态在每篇中单独说明。</p></header><div class="resource-grid">{entries.map(e=><a class="resource-card" href={asset(`projects/${e.id}/`)}><h2>{e.data.title}</h2><p>{e.data.description}</p><small>{e.data.environment||'阅读与小例子'} · {e.data.verification}</small></a>)}</div></div></Base>
+<Base title="实践项目" active="projects/"><div class="page-wrap"><header class="page-title"><span class="eyebrow">AI Infra 系统学习库</span><h1>实践项目</h1><p>先掌握关联章节的机制，再带着一个明确问题深入。环境与验证状态在每篇中单独说明。</p></header><div class="resource-grid">{entries.map(e=><a class="resource-card" href={asset(`projects/${e.id}/`)}><h2>{e.data.title}</h2><p>{e.data.description}</p><small>{span(e.id)} · {e.data.environment||'阅读与小例子'} · {e.data.verification}</small></a>)}</div></div></Base>

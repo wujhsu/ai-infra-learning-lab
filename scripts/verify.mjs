@@ -13,6 +13,26 @@ const reading=json('src/data/reading.json'),concepts=json('src/data/concepts.jso
 const counts={chapters:reading.length,projects:5,code:6,advanced:7};
 assert.equal(new Set(reading.map(x=>x.id)).size,reading.length);
 assert.equal(new Set(concepts.map(x=>x.id)).size,concepts.length);
+const projectsData=json('src/data/projects.json');
+assert.equal(projectsData.length,5);
+assert.equal(new Set(projectsData.map(p=>p.id)).size,projectsData.length);
+const order=id=>reading.find(x=>x.id===id).order;
+const chapterProject=new Map();
+for(const p of projectsData){
+ assert(p.chapters.length>0,`${p.id}: no chapters`);
+ let prev=0;
+ for(const id of p.chapters){
+  assert(reading.some(x=>x.id===id),`projects.json: unknown chapter ${id}`);
+  assert(!chapterProject.has(id),`Chapter in multiple projects: ${id}`);
+  chapterProject.set(id,p.id);
+  assert(order(id)>prev,`projects.json: ${p.id} chapters not ascending at ${id}`);
+  prev=order(id);
+ }
+ const covered=p.phases.flatMap(ph=>ph.chapters);
+ assert.equal(covered.length,new Set(covered).size,`${p.id}: phase overlaps`);
+ assert.deepEqual([...covered].sort(),[...p.chapters].sort(),`${p.id}: phases do not cover chapters`);
+}
+assert.equal(chapterProject.size,reading.length,'Projects do not cover all chapters');
 for(const old of ['learn','labs','topics','archive','legacy'])assert(!existsSync('dist/'+old),'Old route remains: '+old);
 for(const old of ['lessons','topics','labs'])assert(!existsSync('src/content/'+old),'Old content remains: '+old);
 let chapters=0;
@@ -30,6 +50,7 @@ for(const col of collections){const files=walk('src/content/'+col).filter(p=>p.e
   for(const m of content.matchAll(/<Demo type="([^"]+)"/g))assert(['latency','kv','batch','cache','overlap','dra'].includes(m[1]),'Unknown demo');
   assert(!content.includes('<Demo kind='),'Incorrect demo prop');
   assert(content.includes('question:')&&content.includes('answer:'),`${file}: missing self check`);
+  if(col==='chapters'){const proj=content.match(/^project: "?([a-z0-9-]+)"?$/m)?.[1];assert(proj,`${file}: missing project`);assert.equal(chapterProject.get(path.basename(file,'.mdx')),proj,`${file}: frontmatter project does not match projects.json`);}
  }
 }
 const base='/ai-infra-learning-lab/';let links=0;
@@ -48,9 +69,9 @@ for(const file of htmls){const html=read(file);
  }
 }
 for(const [position,item] of reading.entries()){
- const html=read(`dist/read/${item.id}/index.html`),stage=`stage-${item.stage}`;
+ const html=read(`dist/read/${item.id}/index.html`),project=chapterProject.get(item.id);
  assert(html.includes('class="reader-crumbs" aria-label="面包屑"'),`${item.id}: missing breadcrumbs`);
- assert(html.includes(`href="${base}path/#${stage}"`),`${item.id}: missing stage breadcrumb`);
+ assert(html.includes(`href="${base}path/#${project}"`),`${item.id}: missing project breadcrumb`);
  assert(html.includes(`aria-current="page">第 ${position+1} 章`),`${item.id}: incorrect chapter position`);
  assert(html.includes('class="reader-switcher"'),`${item.id}: missing sticky switcher`);
  assert(html.includes('id="reader-nav-dialog"'),`${item.id}: missing chapter picker`);

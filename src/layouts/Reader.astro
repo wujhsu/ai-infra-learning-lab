@@ -3,7 +3,7 @@ import {getCollection} from 'astro:content';
 import Base from './Base.astro';
 import sources from '../data/sources.json';
 import glossary from '../data/glossary.json';
-import {asset,reading,stages} from '../data/curriculum';
+import {asset,reading,projects} from '../data/curriculum';
 
 type ReaderKind='read'|'projects'|'code'|'advanced';
 type NavItem={id:string;title:string;order:number;url:string;stage?:number};
@@ -26,9 +26,9 @@ const index=items.findIndex(item=>item.id===entry.id);
 const position=index+1;
 const prev=items[index-1];
 const next=items[index+1]||(isChapter?{id:'projects',title:'进入实践项目',order:items.length+1,url:asset('projects/')}:undefined);
-const stage=isChapter?stages[(items[index]?.stage||d.stage)-1]:undefined;
+const project=isChapter?projects.find(p=>p.chapters.includes(entry.id)):undefined;
 const groups:NavGroup[]=isChapter
- ? stages.map(s=>({id:s.id,title:`阶段 ${s.id.split('-')[1]} · ${s.title}`,outcome:s.outcome,items:s.chapters.map(id=>items.find(item=>item.id===id)!).filter(Boolean)}))
+ ? projects.map(p=>({id:p.id,title:`${p.label} · ${p.title}`,outcome:p.outcome,items:p.chapters.map(id=>items.find(item=>item.id===id)!).filter(Boolean)}))
  : [{id:kind,title:label,outcome:`共 ${items.length} 篇，按建议顺序排列`,items}];
 const outline=headings.filter((heading:any)=>heading.depth===2).map((heading:any)=>({slug:heading.slug,text:heading.text}));
 const outlineWithCheck=[...outline,{slug:'self-check',text:'换个情况，解释一次'}];
@@ -39,7 +39,7 @@ const unit=isChapter?'章':'篇';
 <div class="reader" data-record={`${kind}/${entry.id}`} data-revision={d.revision}>
  <nav class="reader-crumbs" aria-label="面包屑" data-pagefind-ignore>
   <a href={categoryHref}>{label}</a><span aria-hidden="true">/</span>
-  {isChapter&&stage&&<><a href={asset(`path/#${stage.id}`)}>阶段 {stage.id.split('-')[1]} · {stage.title}</a><span aria-hidden="true">/</span></>}
+  {isChapter&&project&&<><a href={asset(`path/#${project.id}`)}>{project.label} · {project.title}</a><span aria-hidden="true">/</span></>}
   <span aria-current="page">第 {position} {unit}</span>
  </nav>
  <header class="reader-head"><h1>{d.title}</h1><p>{d.description}</p><div class="reader-meta"><span>约 {d.minutes} 分钟 · 阅读估计</span><a data-resume hidden>回到上次读到的地方 →</a></div></header>
@@ -55,7 +55,7 @@ const unit=isChapter?'章':'篇';
   <form method="dialog"><button class="close" aria-label="关闭章节选择器">×</button></form>
   <header><span class="eyebrow">快速切换</span><h2 id="reader-nav-title">{label}</h2><p>当前是第 {position} / {items.length} {unit}</p></header>
   <div class="reader-menu-scroll">
-   {groups.map(group=><details class="reader-menu-group" open={!isChapter||group.id===stage?.id}>
+   {groups.map(group=><details class="reader-menu-group" open={!isChapter||group.id===project?.id}>
     <summary><span>{group.title}</span><small>{group.outcome}</small></summary>
     <ol>{group.items.map(item=><li><a href={item.url} data-course={`${kind}/${item.id}`} data-menu-current={item.id===entry.id||undefined} aria-current={item.id===entry.id?'page':undefined}><span>{String(item.order).padStart(2,'0')}</span><strong>{item.title}</strong></a></li>)}</ol>
    </details>)}
