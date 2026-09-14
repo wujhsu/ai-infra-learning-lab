@@ -228,38 +228,49 @@ h4 {
   justify-self: end;
 }
 
-@media (max-width: 1359px) {
-  .reader-toc,
-  .reader-toc[open] {
-    position: static;
-    width: auto;
-    max-height: none;
-    margin: 18px 0 30px;
-    padding: 0;
-    overflow: visible;
-    border: 0;
-    border-bottom: 1px solid var(--line);
-    background: transparent;
-    font-size: 13px;
-  }
+.reader-toc,
+.reader-toc[open] {
+  position: static;
+  width: auto;
+  max-height: none;
+  margin: 18px 0 30px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font-size: 13px;
 }
 
-/* ≥1360px：本章路标固定为左侧栏。
-   断点依据：正文栏 calc(38 × --reading-size + 48px) 在 22px 字号下 884px，
-   190px 侧栏 + 间距需要 vw ≥ 1352 才不与正文重叠。 */
-@media (min-width: 1360px) {
+/* ≥1020px：本章路标进左栏（栅格左列 + sticky），正文在右列。
+   栅格保证侧栏与正文永不重叠；窗口不够宽时正文列收缩而不是被覆盖。 */
+@media (min-width: 1020px) {
+  .reader {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    column-gap: 40px;
+    align-items: start;
+    max-width: calc(240px + 38 * var(--reading-size) + 48px);
+  }
+
+  .reader-crumbs,
+  .reader-head,
+  .reader-switcher {
+    grid-column: 1 / -1;
+  }
+
+  .reader-toc,
   .reader-toc[open] {
-    position: fixed;
-    left: max(20px, calc(50vw - 660px));
-    top: 110px;
-    width: 190px;
-    max-height: calc(100dvh - 140px);
+    position: sticky;
+    top: 68px;
+    grid-column: 1;
+    max-height: calc(100dvh - 88px);
     margin: 0;
-    padding: 10px;
+    padding: 12px;
     overflow: auto;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: var(--bg);
+    background: var(--paper);
     font-size: 12px;
   }
 
@@ -267,18 +278,23 @@ h4 {
     width: max-content;
   }
 
+  .reader-toc > summary,
   .reader-toc[open] > summary {
     min-height: 36px;
     padding: 2px 4px;
   }
 
-  .reader-toc[open] nav {
-    padding: 0;
+  .reader-toc nav {
+    padding: 0 0 4px;
   }
 
-  .reader-toc[open] a {
-    min-height: 36px;
+  .reader-toc a {
+    min-height: 34px;
     padding: 4px 6px;
+  }
+
+  .reader > article {
+    grid-column: 2;
   }
 }
 
