@@ -3,8 +3,8 @@ title: "训练与推理在集群里怎样运行？"
 description: "从一个训练进程和一个常驻服务开始，理解 Kubernetes 对象、持久数据与就绪状态。"
 order: 30
 stage: 9
-minutes: 8
-revision: 2
+minutes: 16
+revision: 3
 status: "preview"
 terms: ["pod", "pvc"]
 sources: ["k8s", "device-plugin"]
@@ -13,7 +13,7 @@ prerequisites: ["artifacts"]
 question: "为什么给训练 Job 配置自动重试，仍不能称为训练恢复？"
 answer: "重试只重建执行；若程序没有加载一致检查点、优化器和数据进度，它会重新开始或产生不同轨迹。"
 bridge: "下一步：任务为什么有卡也不能立刻启动？把本章的数据与状态继续放进下一段执行过程。"
-verification: "机制与代码审校；待真实试读"
+verification: "清单走读复核（K8s v1.36.0 口径）；集群执行未运行"
 project: "platform"
 introduces: ["pod", "controller", "container", "image", "node", "deployment", "service", "pvc"]
 requires: []
@@ -24,59 +24,227 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
-你已经熟悉后端服务部署，所以这里不重新解释 HTTP。我们只解决集群增加的问题：进程应该在哪台机器运行，失败后谁重建它，模型和检查点放在哪里，以及什么时候开始接收流量。
+上一章把一次运行拆成了可识别的制品：权重 revision、镜像 digest、驱动与配置。现在把镜头移进机房：几十台机器、每台几张卡、多个团队同时提交任务。命令还是那条 `python train.py`，但"在哪台机器上跑、挂了谁重建、卡被谁占用、结果存到哪里"这四个问题，进程自己一个都回答不了。
 
-## 先区分“完成一件事”和“持续提供服务”
+本章的走读材料是平台项目里的一份真实清单 `labs/kubernetes/training-job.yaml`：它把前面训练循环一章的那个极小训练进程表达成一个 Kubernetes Job。先说清为什么必须长成对象，再逐行读清单、读镜像分层，最后看声明式系统靠什么在你不在场时替你干活。口径为 K8s v1.36.0；本章以清单走读与故障预测为主，未在真实集群上执行。
 
-训练通常有终点：达到指定步数，写出检查点并退出。Kubernetes 的 Job 用来表达这类完成型工作负载。推理服务持续监听请求，通常由 Deployment 保持期望副本数。多机模型组还需要后面介绍的 LWS 等更明确的组管理方式。
+## 这一章解决什么问题：进程级管理在集群里怎么失败
 
-<Term id="pod" context="这里一个 Pod 是被调度到同一节点的一组容器及其共享运行上下文；不是一张 GPU，也不是整个分布式训练任务。" /> 是调度和运行的基础对象。容器退出、Pod 被重建、节点失联，是不同层次的事件。重建一个训练 Pod 不会自动把程序恢复到上次 step；应用必须实现检查点加载。
+设想用最熟悉的方式跑训练：SSH 登录一台机器，`nohup python train.py &`，关掉笔记本下班。这就是进程级管理——一切依赖你（或你的巡检脚本）在场。把它放进集群，至少四个失败场景立刻出现：
+
+- **节点挂了谁重启。** 凌晨三点机器断电，nohup 的进程随之消失，没有任何组件认为重建它是自己的职责。下一次有人看结果，已经是第二天中午。
+- **GPU 谁独占。** 你挑了自认为空闲的卡 3，五分钟后另一位同事的推理服务也落在卡 3 上。两个进程互相把对方的显存挤爆——谁都没有恶意，谁都只能重来。
+- **在哪台机器跑。** 集群里几十台机器，哪台有卡、哪台磁盘将满、哪台驱动版本匹配，你并不知道；逐台 SSH 探测不可扩展，也不实时。
+- **结果放在哪。** 进程写进本地临时目录的检查点，随容器与机器一起消失；重试拿到的总是一个空目录。
+
+再深挖一层"GPU 谁独占"：单机时代你用 `CUDA_VISIBLE_DEVICES` 手工指卡，分配的正当性来自"这台机器归我"。集群里同一台机器属于所有人，分配必须变成集群看得见的约定——资源字段加上设备插件的报告与注入。谁绕过这套约定直接在容器里探测并占用"看起来空闲"的卡，谁就在制造下一个隐性共享故障。
+
+这四个场景的共同点值得停在原地多看一眼：它们都不是"计算错误"——训练循环本身可以完全正确——而是"生命周期无人负责"。Kubernetes 的价值主张正是把生命周期接过去：你声明想要什么（一个跑完 100 步、把检查点写到持久卷的训练），一组控制器持续观察实际状态与期望状态的差距，并采取行动消除差距（节点挂了就换一台健康节点重建）。四个问题也各自有了负责的对象：在哪台机器跑交给 Pod 与调度器，挂了谁重建交给控制器，卡被谁占交给资源字段与设备插件，结果放在哪交给 PVC 与存储。
+
+常驻推理服务在这套语法里的对应物是 Deployment 与 Service：前者维持期望副本数，后者在不断更换身份的 Pod 前面提供稳定入口。本章走读只展开 Job，但"每个字段挡住哪类失败"的读法，对这两类对象同样成立。
+
+同时划清本章反复回到的边界：控制器重建的是**执行**，不是**训练进度**。重建后的 trainer 进程从第 0 步开始，除非程序自己加载检查点——参数、优化器状态、步数、随机状态一项都不能少，那是前面训练循环一章已经列过的清单。`backoffLimit: 1` 能给你一次重试，不能给你一次恢复。
+
+把那次重试拆开看，边界会更具体。假设第 100 步保存失败、容器非零退出：Job 控制器新建一个 Pod，调度器很可能仍把它放回原节点——镜像在节点缓存里，PVC 重新挂上，`/results` 里上次写坏的文件还在。新进程从第 0 步重新开始：参数重新随机初始化，优化器状态从零累积。就算程序存过检查点，不显式加载的话，之后的轨迹与未中断基线并不相同——"重试"与"恢复"的差别就在这里：前者重建执行，后者要求程序亲手把进度接回来。Kubernetes 全程尽责，训练却悄悄变了样。
+
+## 机制讲解：一份清单怎样把进程变成被管理的对象
+
+### Pod：被调度的单位不是容器
+
+一句话到位：<Term id="pod" context="这里一个 Pod 是被调度到同一节点的一组容器及其共享运行上下文；不是一张 GPU，也不是整个分布式训练任务。" /> 不是容器的别名——它是一组共同调度、共享网络等命名空间的容器，由一个先于业务容器启动的根容器（常称 pause 容器）持有这些共享命名空间，业务容器启动时逐一加入它。所以同一个 Pod 里的容器看起来像同一台主机上的进程：同一 IP、同一端口空间、可以通过 localhost 互访。
+
+对本章的意义有三条。第一，调度、重启、删除的单位是 Pod——"挂了重建"重建的是整个 Pod，不是其中某个容器。第二，资源申请写在 Pod 的容器上，调度器按整个 Pod 核账。第三，后面 LWS 章的 leader 与 worker 共享身份、推理引擎与 sidecar 同址部署，用的都是"放进同一个 Pod"这个手段。反过来也要知道 Pod 不是什么：它不是虚拟机，没有稳定的 IP 承诺，重建后网络身份就变了；需要稳定入口时用 Service 这类对象间接暴露。
+
+由此分清三种常被混为一谈的事件：**容器退出**由所在节点的 kubelet 按重启策略就地处理；**Pod 被删除重建**由 Job 或 Deployment 控制器负责补齐；**节点失联**则先由节点控制器把节点标记 NotReady，宽限期后其上的 Pod 被判定终止、交还控制器重建。三层事件各有负责人、各有时间常数——排障时先问"这是哪一层的事件"，再去看对应组件的日志，比一上来翻应用输出快得多。
+
+### 逐行走读 training-job.yaml
+
+清单是用 `---` 分隔的三个对象：Namespace（把实验圈在 `training-lab` 命名空间里，资源与权限有边界）、PersistentVolumeClaim（存储请求）、Job（工作负载本体）。文件首行是模板注释：镜像地址要替换，StorageClass 要按集群选。后两个对象的原文如下：
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: training-results, namespace: training-lab}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {name: tiny-training, namespace: training-lab}
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: trainer
+          image: YOUR_REGISTRY/ai-infra-tiny:VERSION
+          resources:
+            requests: {cpu: "1", memory: 1Gi}
+            limits: {cpu: "2", memory: 2Gi}
+          volumeMounts: [{name: results, mountPath: /results}]
+      volumes:
+        - name: results
+          persistentVolumeClaim: {claimName: training-results}
+```
+
+三个对象一次 apply 进去，生效有先后：Namespace 先建；PVC 随即进入 Pending，等默认 StorageClass 背后的存储组件把卷绑定为 Bound——这正是首行注释要你确认 StorageClass 的原因，集群没有默认值时这个 PVC 会永远 Pending；Job 创建的 Pod 走到挂载那一步，才有卷可挂。`backoffLimit: 1` 而不是 0 也是教学选择：极小任务的失败几乎只有"镜像拉不下来"与"保存路径不对"两类，给一次重试足以区分偶发与必然，不给满默认的 6 次机会去浪费时间。
+
+读清单的路径本身值得固定下来：先从 `kind` 看寿命模型（Job 还是 Deployment），再沿 `template.spec` 看进程怎么起——重启策略、容器、卷——最后才读容器内的字段。骨架定位错了，细节读得再细也是错层。
+
+从上往下，每个字段挡在一类失败前面。读法统一成一句问话：**没有它会怎样？**
+
+- **`metadata` 的 `name` 与 `namespace`**：对象的名字与归属。Job 的核心字段创建后大多不可变，同名 Job 已存在时改内容再 apply 会被拒——重跑一个任务的常见做法是删掉重建或换名字；而换名字意味着一个全新任务，名字是控制器对账的锚点，换名字等于换一份期望状态。
+- **`accessModes: [ReadWriteOnce]` 与 `storage: 1Gi`（PVC）**：<Term id="pvc" /> 是工作负载对存储的要约——多大、以什么方式挂，与具体底层实现解耦。没有这个对象，训练结果只能写进容器可写层，容器一重建就消失；`backoffLimit` 的那次重试拿到的将是空目录。ReadWriteOnce 约定同一时刻只挂到单个节点，单卡训练正好；若哪天两个 rank 要在不同节点同时写同一路径，错的是这个模式本身，不是容量不够。访问模式、拓扑与容量仍需按集群核对——PVC 解耦的是实现，不豁免检查。
+- **`kind: Job`（batch/v1）**：完成型工作负载——跑到终点、写出结果、正常退出。这与 Deployment 表达的"持续提供服务、永远维持 N 个副本"是两种寿命；推理服务属于后者，训练属于前者。用错对象不是语法错误：把训练塞进 Deployment，训完退出的容器会被不断拉起，任务永无终止。
+- **`backoffLimit: 1`**：Pod 失败后，Job 控制器允许的重试上限。删掉它，默认值是 6——清单照样合法，但**失败变贵**：一个注定失败的任务要烧满 6 次才被标记 Failed。
+- **`restartPolicy: Never`**：容器级重启策略，Job 只接受 Never 或 OnFailure。Never 让失败的容器直接终结 Pod、由 Job 控制器按 backoffLimit 决定是否新建；OnFailure 让 kubelet 在同一个 Pod 里原地重启容器。删掉这一行，PodSpec 的默认值是 Always——API 服务器在 `kubectl apply` 当场拒绝这份清单。同一个字段，写哪个值管"谁负责重启"，漏写它管"能不能提交"。
+- **`image: YOUR_REGISTRY/ai-infra-tiny:VERSION`**：模板占位符，提交前要替换成可拉取的地址。占位符没换的症状出现在调度之后：Pod 停在 ImagePullBackOff，事件里写着拉取失败。注意这里**没有写 `imagePullPolicy`**——省略时按 tag 推断，非 latest 标签默认 IfNotPresent，latest 或无标签默认 Always。这个默认值的坑很具体：你改了代码、推了同名标签，节点上仍缓存着旧镜像层，IfNotPresent 直接命中本地——"我明明改了代码，怎么没生效"。上一章的结论在这里兑现：要确定的内容用 digest（`image@sha256:...`）固定，标签只是便于人选。
+- **`resources.requests` 与 `limits`**：requests 参与调度核算，调度器据此决定 Pod 放哪台节点；limits 约束运行时——内存超限被 OOMKill，CPU 超限被限流而不是杀掉。删掉整个 resources 块，清单照样合法：Pod 落入 BestEffort 档，节点内存吃紧时**最先被逐出**。"没有报错"与"没有问题"在这里是两回事。这份清单刻意不申请 GPU——极小模型在 CPU 上就能跑完；真实训练会把 `nvidia.com/gpu: 1` 写进 limits，由设备插件报告并注入设备，更细的设备属性表达是后面 DRA 章的主题。但申请到一张 GPU 只解决"数够了"：显存装不装得下模型是另一本账——权重加载时超限，发生在容器启动之后，事件里是 OOMKilled，不是 Pending。
+- **`containers[0].name: trainer` 与 `volumeMounts`、`volumes.persistentVolumeClaim`**：容器必须有名——日志、事件、exec 都用它定位。挂载这一对把 PVC 接到容器内 `/results`，train.py 的 `--output /results/tiny.pt` 写的就是这里。这一对不写，症状最阴险：**100 步训练全部正常**，最后保存时 `/results` 目录不存在，FileNotFoundError，容器以非零码退出——然后 backoffLimit 把这 100 步原样再烧一遍。失败发生在结尾，浪费发生在全程。
+
+把"没有它会怎样"按时刻排开，就得到一张故障时间线：一个字段在哪一级生效，它的问题就在哪一级显形。
+
+| 阶段 | 谁在检查 | 典型症状 | 清单里对应的字段 |
+|---|---|---|---|
+| 提交 | API 服务器（校验与准入） | apply 当场报错 | restartPolicy、kind、quota |
+| 调度 | 调度器 | Pending：资源不足、亲和不满足 | resources.requests、nvidia.com/gpu |
+| 挂载与拉镜像 | 节点 kubelet | ContainerCreating 卡住、ImagePullBackOff | volumes、image、imagePullPolicy |
+| 运行 | 应用与容器运行时 | OOMKilled、非零退出 | limits、volumeMounts |
+| 失败重试 | Job 控制器 | 重建 Pod，至多 backoffLimit 次 | backoffLimit、restartPolicy |
+
+对着一份清单就能预演 `kubectl describe` 将要报告的事件——动手一节会反过来考这件事。
+
+### 镜像的层：training.Dockerfile 的六行账
+
+清单里那个镜像怎么造。Dockerfile 全文六行，但顺序是算过账的：
+
+```dockerfile
+FROM python:3.12.14-slim
+WORKDIR /app
+COPY labs/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+COPY labs/tiny_model /app/labs/tiny_model
+CMD ["python", "labs/tiny_model/train.py", "--steps", "100", "--output", "/results/tiny.pt"]
+```
+
+容器镜像按层构建，每层的身份由内容决定。重建时自上而下逐层比对：内容未变的层直接复用缓存，变了的那层**连同其后所有层**重新执行。所以这份文件的顺序是：先拷依赖清单、安装依赖（第 3–4 行），**最后**才拷业务代码（第 5 行）。PyTorch 一族的依赖动辄数 GiB；若把拷代码提到 pip install 之前，每改一行 train.py 都要把整个依赖安装重跑一遍，推到仓库、拉到每个节点的内容也随之膨胀。"改代码不重下那 4 GiB"，靠的就是把易变的代码放在笨重的依赖层之后。
+
+基础镜像也有讲究：`python:3.12.14-slim` 钉死了完整版本号并选了 slim 变体——版本钉死让底层层可复现，slim 让最底下那层的传输量小一个量级。基础层同样吃内容寻址的缓存红利：只要它不变，所有派生镜像在节点上共享同一份。
+
+两个细节也别放过。`--no-cache-dir` 不把 pip 的下载缓存留在镜像层里——镜像只会更小，不会更慢，因为下一层本来就要重新执行。`CMD` 用 exec 数组形式而不是一整条 shell 字符串：python 直接成为容器的一号进程，SIGTERM 到达时进程能亲手收到而不是被外层 shell 吞掉——优雅退出、把写到一半的检查点收尾，靠的就是这一行书写形式的差别。
+
+同一个逻辑解释了为什么**权重不烤进这份镜像**：本章的极小模型从随机初始化训练，镜像里只有代码。真实工程常把权重单独成层、置于代码层之前，并用 revision 固定身份（上一章的制品口径）：权重层内容不变，代码怎么改，节点上已经拉下来的数 GiB 权重层都原样复用。分层的本质是把变化频率不同的内容拆开，让每次变更只支付真正变化的那部分的构建与传输。
+
+### 清单、镜像、权重：三种内容的寿命
+
+走读完清单与镜像，把一次训练涉及的三个载体并排看，分层缓存为什么值得费心就一目了然：
+
+| 内容 | 变化频率 | 存放位置 | 身份由什么固定 |
+|---|---|---|---|
+| 对象清单 | 每次实验调整 | git 仓库 | 源码 commit |
+| 容器镜像 | 每次改代码重建 | 镜像仓库 | 镜像 digest |
+| 权重与检查点 | 训练中不断产出 | PVC 与对象存储 | 模型 revision / 检查点元数据 |
+
+三者寿命不同、位置不同、身份方案不同，恰好对应上一章制品清单的三个条目。排障时同样按这张表定位："用的是哪份代码"问 git，"跑的是哪个镜像"问 digest，"加载的是哪版权重"问 revision——用名字或标签回答其中任何一个问题，都只是在报告一个可能过期的指针。
+
+### 声明式与调和循环：谁在你不在场时干活
+
+命令式与声明式的差别，用"节点故障"这一件事对齐最清楚。仍是凌晨三点，承载训练的节点断电：
+
+| | 命令式（nohup / 脚本） | 声明式（Job 对象与控制器） |
+|---|---|---|
+| 你提交的是什么 | 一条执行命令 | 一份期望状态："跑完这个训练" |
+| 谁发现节点挂了 | 没有人，或你次日看结果时 | 节点控制器：心跳超时，节点标记 NotReady |
+| 谁决定怎么办 | 你 | Pod 经超时/驱逐判定为失败，Job 控制器接管 |
+| 动作是什么 | 重新登录、重启、从头再跑 | 调度器另选健康节点，新建 Pod |
+| 改镜像或改副本数时 | 登录每台机器逐个操作 | 改清单再 apply，控制器算出差异并落实 |
+| 前提是你准备了什么 | 无事故的运气 | PVC 里的检查点、幂等的启动逻辑 |
 
 <Diagram id="reconcile" caption="声明期望状态后，控制器、调度器与节点组件分别负责重建、放置和启动。" />
 
-## 声明资源是在约定什么
+调和循环的形状在每种控制器上都一样：观察实际状态，与期望状态求差，行动消除差距，循环往复。Job 的控制器盯着"有几个 Pod 成功完成"，Deployment 的控制器盯着"活着几个副本"，机制同构，期望不同。拿本章的 Job 走一遍：期望态是"一个 Pod 成功完成"；控制器观察到既没有成功计数也没有存活的 Pod——差距存在——于是创建 Pod；保存失败后差距依旧，就再创建一个，直到成功一次，或超过 `backoffLimit` 把整个 Job 标记为 Failed。任何时刻 describe 这个 Job，status 字段就是控制器最近一轮观察的结论。你的参与从"执行每一步"退到"写对期望状态"——这正是走读清单的意义：**清单里的每个字段，都是你在替凌晨三点的自己做的决定。**表里两列也并非对立，而是分工：声明式接管"让世界回到期望态"之后，命令式脚本仍有用武之地，只是从"驱动每一步"退到"批量提交期望、批量核对结果"。
 
-CPU 与内存 requests 参与调度资源核算；limits 约束运行时使用。GPU 的传统扩展资源通常以设备数量请求，例如 `nvidia.com/gpu: 1`。设备插件报告可用设备并参与容器设备注入，具体共享行为取决于设备插件和驱动配置。[设备插件机制](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/device-plugins/)
+边界也在这里再次显形：控制器能收敛的是"有一个 Pod 在跑"。期望状态里没有"进度"这一项；若程序不实现断点续训，重建的 Pod 会从第 0 步重来——把进度变成程序自己的责任，检查点才有机会登场。
 
-一张 GPU 申请成功，不代表该 GPU 有足够显存加载任意模型，也不意味着应用会自动选择正确精度。调度层、设备层与模型显存账本需要共同成立。
+## preflight 为什么存在：Pod Running 不等于 GPU 可用
 
-```yaml
-# 部署片段：只表达一个容器的资源；完整清单见平台项目。
-resources:
-  requests:
-    cpu: "2"
-    memory: 8Gi
-  limits:
-    cpu: "4"
-    memory: 16Gi
-    nvidia.com/gpu: 1
-```
-
-CPU 配得过少可能让 tokenizer 与数据准备跟不上 GPU；内存不足可能在权重加载时被终止。这两种问题都不能靠 GPU 利用率一个数诊断。
-
-## 模型与检查点怎样跨过 Pod 的寿命
-
-容器文件系统与临时卷适合可丢弃缓存。需要跨重建保留的数据，应写到持久存储或外部对象存储。<Term id="pvc" /> 将所需存储与具体底层实现解耦，但访问模式、拓扑、容量和性能仍需检查。
-
-单节点能写的卷不等于多个训练 rank 都能在不同节点同时挂载。共享检查点路径也不等于自动具备一致性提交。先在两个目标节点读写一个小文件，验证挂载和权限，再进行多 GiB 的检查点测试。
-
-## 三种探针不能混用
-
-startupProbe 给较慢的首次初始化留出窗口；readinessProbe 表示当前是否适合接流量；livenessProbe 用于发现需要重启的失活状态。模型正在下载时不 ready 是合理状态，不一定应该被 liveness 反复杀掉。
-
-只检测端口打开也可能过早。进程监听不代表模型权重、跨 rank 通信和必要预热已完成。与此同时，过重的健康检查又可能消耗推理资源。选择可解释的轻量检查，再用部署后的真实小请求作为业务检查点。
-
-## 按事件顺序排查一次 Pending
-
-先看 Pod 事件：若显示资源不足，进程尚未启动，应查设备数量、亲和约束、配额与节点状态。若停在挂载或镜像拉取，检查存储和镜像访问。若容器启动后报错，才进入应用日志。把这三阶段分开，能避免对尚未获得设备的 Pod 调整模型参数。
+清单通过、镜像拉下、容器起来，只证明进程活着。从"活着"到"能加载模型"之间还有两级可能断掉的链路：宿主驱动与设备注入、容器内用户态 CUDA 运行库。直接加载模型的问题在于它最贵也最能误导——分钟级的加载换来一句常常指向错误地方的报错。上一章的做法是先做最小对照："若最小计算都失败，直接调 vLLM 的批次参数只会把问题混在一起。"`labs/kubernetes/preflight.sh` 把这个思想落成脚本，关键行如下：
 
 ```bash
-kubectl -n inference-lab get pods -o wide
-kubectl -n inference-lab describe pod POD_NAME
-kubectl -n inference-lab logs POD_NAME --all-containers
+set -euo pipefail
+rank="${RANK:-unknown}"
+report(){ printf '{"rank":"%s","check":"%s","result":"%s"}\n' "$rank" "$1" "$2"; }
+nvidia-smi >/dev/null && report gpu visible
+python3 -c 'import torch; assert torch.cuda.is_available(); print(torch.__version__)'
+report runtime passed
+if [[ -n "${MASTER_ADDR:-}" ]]; then
+ python3 -c 'import socket,os; print(socket.getaddrinfo(os.environ["MASTER_ADDR"],None))'
+ report dns passed
+fi
+printf '%s\n' 'Local pass is NOT an all-rank pass. Run allreduce.py with a bounded rendezvous.'
 ```
 
-`POD_NAME` 要替换为第一条命令返回的真实名字。若发生重启，还要读取前一容器实例日志并保存时间与节点身份。
+这是一条按代价排序的三级验证链，首行 `set -euo pipefail` 给它加上短路语义：任何一级失败，脚本立即非零退出，后面更贵的检查根本不执行。
 
-当多团队同时提交训练任务，仅仅让所有 Pod 竞争节点还不够。下一章先在任务层决定谁获得启动预算，再讨论具体放置。
+1. **`nvidia-smi`——宿主驱动与设备注入。** 容器里能列出 GPU，说明宿主驱动在、设备插件的注入在。失败根因在节点侧，与模型无关。
+2. **`torch.cuda.is_available()`——容器内最小 CUDA 检查。** 用户态运行库与驱动握手成功。镜像内的 CUDA 版本与宿主驱动不匹配，死在这一级，几秒钟出结论。
+3. **之后才轮到加载模型。** 便宜的检查全过，昂贵的操作才有意义。`MASTER_ADDR` 存在时还多测一层 DNS——多机 rendezvous 连对端名字都解析不了的话，集合通信库稍后给出的报错会难读得多。
+
+三级链同时把故障归因切成三段：设备不可见归节点侧，运行库握手失败归镜像侧，到了第三级才轮到模型与程序自身。preflight 的价值不在于"发现有没有故障"，而在于把"哪里坏了"先替你回答一半。
+
+两处细节值得指出。其一，输出是机器可读的 JSON（rank、检查项、结果），不是散文日志——巡检与告警可以直接消费，这正是后文观测章强调的结构化输出。其二，脚本最后一行是写给自己的警告：**local pass 不是 all-rank pass**。单卡全绿不代表组内每张卡都绿；完整结论要再做一次有界的最小集合通信（allreduce.py），那是 collectives 与 LWS 章的内容。
+
+这条链在 `render-lws.py` 渲染的推理清单里走到了尽头：worker 容器先 `nvidia-smi`、再跑两节点 allreduce，全部通过才 `touch /tmp/preflight-passed`，然后才 `exec vllm serve` 加载模型；而它的 readinessProbe 就是 `test -f /tmp/preflight-passed`——**就绪状态直接接在验证链的结果上，而不是"端口开了"**。leader 侧的 startupProbe 给了 `failureThreshold: 90` 的宽窗，因为加载慢是正常态：模型正在下载时不 ready 是合理状态，不该被 liveness 反复杀掉。三种探针的分工由此可记：startup 给慢启动留窗，readiness 回答"现在适不适合接流量"，liveness 回答"要不要重启"。用错对象，验证链反而会亲手杀掉健康的进程。探针本身也要轻：过重的健康检查在消耗推理资源，选可解释的轻量检查，再用部署后的真实小请求作为业务层检查。
+
+## 动手：删掉三个字段，预测它何时坏
+
+不走读别人的清单了，改自己的。前两步纸面即可完成，第三步留给有集群的时候。按步骤做：
+
+1. 打开 `labs/kubernetes/training-job.yaml`，从 Job 与 PVC 里挑 **3 个字段**删掉。尽量让它们分布在三个不同时刻：提交时、调度或挂载时、运行结束时。
+2. 对每个被删的字段写下预测：**什么时刻**失败（apply 当场？Pending？ContainerCreating？第 100 步保存时？节点故障重建后？），**什么症状**（哪条报错、哪个事件、哪条命令能看到）。预测按固定格式写，方便事后核对，例如：删掉 `restartPolicy` → 预测在提交时失败，症状是 apply 报 `Unsupported value: "Always"`，集群里没有创建任何对象。
+3. 有集群时再逐条核对：`kubectl apply --dry-run=server` 先单测校验层，正式 apply 后用 `kubectl -n training-lab get pods -o wide` 看阶段，`describe pod` 看事件，`logs --all-containers` 看应用层；若发生过重启，还要读上一容器实例的日志并记下时间与节点身份。本章未运行集群，预测依据是 v1.36.0 的默认值与校验规则；核对表如下。
+
+<details>
+<summary>展开核对</summary>
+
+| 删掉的字段 | 失败时刻 | 症状 |
+|---|---|---|
+| `restartPolicy: Never` | 提交时 | PodSpec 默认 Always，Job 校验拒绝：`Unsupported value: "Always"`，apply 当场报错，集群里什么都没创建 |
+| `accessModes: [ReadWriteOnce]` | 提交时 | PVC 的 accessModes 是必填项，校验拒绝：`spec.accessModes: Required value`，同样轮不到调度 |
+| `image` 占位符未替换 | 调度后 | Pod 停在 ImagePullBackOff，事件显示拉取失败——进程从未启动，此时调模型参数没有意义 |
+| Job 的 `metadata.namespace` | 调度时 | Job 落到默认命名空间、与 PVC 不在同一处：调度事件报 persistentvolumeclaim not found，Pod 停在 Pending，轮不到节点 |
+| `resources.requests` 整块 | 当时不失败 | BestEffort 档合法运行；节点内存压力到来时最先被逐出，症状是随机时刻的 Evicted，而非提交时的报错 |
+| `volumeMounts`（连带 volumes） | 第 100 步保存时 | 100 步全部正常，`--output /results/tiny.pt` 落到不存在的目录，FileNotFoundError 退出非零；backoffLimit 再把 100 步烧一遍 |
+| `backoffLimit: 1` | 不失败 | 默认 6：坏任务的失败要烧满 6 次重试才标记 Failed——失败检测变贵，不是运行变错 |
+
+贯穿全表的同一个观察角度：**字段在哪一级生效，删掉它就在哪一级报错。**校验类字段在 API 服务器（提交时），资源类字段在调度器（Pending），卷类字段在节点（ContainerCreating），挂载路径在应用（运行末尾）。`describe` 的事件顺序会把这张表活演一遍。
+
+变式再练一次：不删字段，把 `limits.memory` 从 2Gi 改成 256Mi，预测什么时刻、什么症状。清单合法、调度成功，但这个极小模型连权重带激活不过几 MiB，真正吃内存的是 torch 运行时本身——容器多半在导入阶段就被 OOMKill，退出码 137，事件里写着 OOMKilled。上限配小不是提交时的问题，是运行时的问题；而且它不在你训练的代码里炸，在你还没开始训练的时候就炸。
+
+</details>
+
+删字段练的是反向能力：读一份陌生清单时，能立刻指出每个字段挡在哪类失败前面。三个预测全部命中的话，说明那张时刻表已经内化——下一章面对"任务有卡却不能启动"时，你首先要判断的仍然是：卡在哪一级。
+
+预测表里"当时不失败"的两行（requests 整块、backoffLimit）比会报错的行更值得警惕：会报错的故障自己会喊，不报错的故障只会挑你最忙的那周出现。
+
+当多团队同时提交训练任务，仅仅让所有 Pod 竞争节点还不够——谁先拿到启动预算、配额怎么核算，是下一章的准入问题。
+
+<Lab lab="labs/kubernetes/training-job.yaml" title="把删字段的预测放进集群核对" status="cluster">
+
+替换镜像占位符、确认默认 StorageClass 后，在集群上 apply，对照你在动手一节写下的预测逐条核验事件与日志。
+
+```bash
+kubectl apply -f labs/kubernetes/training-job.yaml
+kubectl -n training-lab get job tiny-training
+kubectl -n training-lab get pods -o wide
+kubectl -n training-lab describe pod POD_NAME
+kubectl -n training-lab logs POD_NAME --all-containers
+```
+
+`POD_NAME` 要替换为前一条命令返回的真实名字。在真实集群上 apply 属于平台项目，未运行；预期观察点是预测表中的时刻与症状逐项对上。
+</Lab>

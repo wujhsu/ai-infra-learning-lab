@@ -3,8 +3,8 @@ title: "多进程推理怎样一起启动和恢复？"
 description: "从两台机器共同服务一个模型开始，建立工作组、启动检查与失败处理的边界。"
 order: 33
 stage: 9
-minutes: 8
-revision: 2
+minutes: 16
+revision: 3
 status: "preview"
 terms: ["lws", "preflight"]
 sources: ["lws", "lws-api", "lws-preflight"]
@@ -13,7 +13,7 @@ prerequisites: ["dra"]
 question: "一个四卡模型工作组内的 worker 失败，剩余三卡进程仍活着，服务是否健康？"
 answer: "不能据此判断健康。紧耦合模型可能已经无法完成请求；应按框架与组策略处理全组状态，并通过真实服务检查确认恢复。"
 bridge: "下一步：怎样从用户请求追到模型与 GPU？把本章的数据与状态继续放进下一段执行过程。"
-verification: "机制与代码审校；待真实试读"
+verification: "清单渲染已验证（LWS 0.10.0 / vLLM 0.29.0 口径）；集群执行未运行"
 project: "platform"
 introduces: ["lws", "preflight"]
 requires: []
@@ -26,52 +26,220 @@ import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
 import Lab from '../../components/Lab.astro';
 
-一个模型通过张量并行分布在两台机器上，任一机器都不能独立完成请求。若把它们当作两个普通无关副本，平台可能认为“还有一个进程活着”，但整个模型实际上已经不可用。
+## 这一章解决什么问题
 
-<Term id="lws" /> 用 leader 与 workers 表达一组协作 Pod，并管理组的副本与更新关系。这里 leader 是组内角色，不是“永远负责所有 GPU 计算”的通用算法规定。具体服务如何启动进程、建立通信和接收请求，由运行框架决定。
+<a href={asset('read/serving/')}>serving 章</a>结束时，服务的形状是一个容器、一张卡、一条 `docker run`。真实的大模型服务经常不是这个形状：一张卡放不下权重，或者单卡的带宽与算力撑不起目标吞吐，于是模型被切到多台机器上，**多个进程共同服务同一条请求**。问题从这一步开始出现——Kubernetes 的最小调度单位是 Pod，而"一个推理副本"现在是一组 Pod 的集合。把一组协作进程当成 N 个互不相干的副本来管理，平台看到的存活状态和模型的真实可用状态会立刻分叉。
 
-## 三层数量不要混淆
+先把这组进程里的两种角色分开。**leader 与 worker 不是"主力与备胎"，而是同一份模型计算里的两种职责分配**：
 
-一组有一个 leader 和若干 worker；每个 Pod 可以使用一张或多张 GPU；整个服务还可以有多个独立工作组。LWS 的组副本、每组大小、引擎的 TP/PP 配置分别描述不同层次。
+| 职责 | leader | worker |
+|---|---|---|
+| 权重加载 | 加载自己那一份数据并行或流水线切分后的参数——leader 不替别人下载 | 同样加载自己的那份；每张卡都得装上自己的部分 |
+| 通信组网 | 进程组的会合点住在这里：ray 集群的 head（生产多机 vLLM 的常见后端），或本实验钉死的多进程 master。先起、等人来连 | 启动后主动连接 leader 报到，领取自己在组内的编号 |
+| 推理执行 | 全员平等地计算自己那段层或切片；leader 额外兼任唯一的 API 端点 | 只计算、不接客（本实验用 `--headless` 关掉 API 服务） |
 
-例如，两组副本，每组两个 Pod，每 Pod 两张 GPU，共需 8 张 GPU。模型可在每组内使用 4 张 GPU 协作，网关在两组之间路由。把组副本从 2 改成 3，需要额外完整一组资源，不是向现有组随意追加一个 rank。
+分工里藏着本章所有麻烦的根源：worker 的启动**依赖 leader 先在场**——地址要能解析、会合端口要有人监听。而原生工作负载控制器恰好不承诺任何启动顺序。
 
-## 在加载大模型之前检查什么
+这也直接指向 frontmatter 里的问题：一个四卡工作组内的 worker 失败，剩余三卡进程仍活着，服务是否健康？读完本章你会看到，"还有进程活着"这个证据在紧耦合组里几乎不携带信息——通信对端缺一个人，AllReduce 就永远凑不齐。
 
-<Diagram id="preflight" caption="从本地配置到全组通信逐层检查。检查失败应留下证据，并设置有限的重试预算。" />
+读完你应该能：
 
-<Term id="preflight" /> 是正式执行前验证必要条件。先看设备数、模型挂载与配置是否一致；再看对端发现、DNS、端口与网络；最后运行一个与实际通信后端一致的小 collective。只有本地文件存在，不能证明全组可协作。
+- 说清 LWS 里一个"副本"指什么：组、组内角色、注入的环境变量各解决了哪块拼图；
+- 用一组假设数字算"组副本 × 每组并发"的吞吐账，指出线性区与饱和区的分界在哪；
+- 逐段读懂 `render-lws.py` 渲染出的清单：每个环境变量对应哪个 vLLM 启动参数，哪个参数实现并行、哪个实现对外名字。
 
-检查要具备全组含义。若一个 rank 已经进入 AllReduce，另一个还在下载依赖，前者会等待；若各 rank 对参与集合或调用顺序理解不同，检查本身也会挂住。因此，检查进程需要一致配置、明确超时、统一退出行为与可区分 rank 的日志。
+证据边界先交代：本章只在本地 CPU 上渲染清单并按 LWS 0.10.0 与 vLLM 0.29.0 的口径核对 schema；**没有在真实集群上 apply，也没有运行过两节点推理**。文中所有吞吐与时间数字都是标注过的算例。GPU 怎么被分配进 Pod，是前置的 <a href={asset('read/dra/')}>dra 章</a>建立的账，本章只消费它的结论。
 
-本库的 preflight 脚本验证基础通信路径，不测完整模型性能，也不保证所有大消息与长时间运行都稳定。通过它之后仍要执行模型加载、小请求和压力测试。
+## 机制讲解：组、启动顺序与伸缩的账
 
-## 某个成员失败时，其余成员怎么办
+### 先把三层数量分开
 
-如果 worker 失去 GPU，其他 rank 可能继续等待通信。只重启这个容器是否安全，取决于框架是否支持重新加入，以及其余成员状态是否仍可恢复。对紧耦合推理组，重建整组通常更容易重新建立一致的通信与模型状态，但恢复时间和资源成本更高。
+讨论 LWS 之前最容易混淆的是三个不同层次的"数量"：**组副本数**（`spec.replicas`，整个服务有几个独立工作组）、**组大小**（`leaderWorkerTemplate.size`，每组几个 Pod）、**引擎并行配置**（组内的 TP/PP 怎么切）。三层各是一个独立的旋钮。
 
-LWS 提供重启策略，具体取值和行为应查安装版本。不能把 Pod 自身的 `restartPolicy` 与 LWS 的工作组重建策略混为一谈。[LWS 失败处理](https://lws.sigs.k8s.io/docs/concepts/failure-handling/)
+例如两组副本、每组两个 Pod、每 Pod 两张 GPU，共需 8 张 GPU：模型在每组内用 4 张卡协作，网关在两组之间路由。把组副本从 2 改成 3，是新增一个完整的工作组，不是向现有组追加一个 rank——组内成员数变了，引擎的 `--nnodes` 与并行参数都得跟着改。**组数是吞吐旋钮，组大小与 TP/PP 是模型形状旋钮**，改前者不该动后者。
+
+本实验渲染的清单是 1 组 × 2 Pod × 每 Pod 1 卡；下一节算吞吐账时用 2 组做算例，正好覆盖"翻倍"这个动作。
+
+### LeaderWorkerSet 的语义：同模板、不同角色
+
+<Term id="lws" /> 是一个 Kubernetes 扩展 API，把"一组协作 Pod"提升为一等公民：`spec.replicas` 个组，每组 `size` 个 Pod，其中 1 个 leader、其余是 worker。关键机制有三条：
+
+- **每组底层是一个 StatefulSet，leader 是组内 0 号成员**（`worker-index` 标签为 0）。稳定网络身份由此而来——worker 需要的"leader 的名字"不是碰运气的环境变量，而是随组存在的 DNS 名。
+- **控制器向组内每个 Pod 注入三个环境变量**：
+
+| 注入变量 | 含义 | 本实验的消费方 |
+|---|---|---|
+| `LWS_LEADER_ADDRESS` | leader Pod 的 DNS 名 | torchrun 与 vLLM 的 `--master-addr` |
+| `LWS_WORKER_INDEX` | 本 Pod 在组内的序号（leader 为 0） | `--node-rank` |
+| `LWS_GROUP_SIZE` | 组内 Pod 总数 | `--nnodes` |
+
+- **leader 与 worker 共用同一份 Pod 模板，只是角色不同**。`render-lws.py` 里就是字面意思：一个 `template(leader)` 函数生成两份，leader 多打端口与 HTTP 探针的补丁，worker 多打一个 `--headless`。"同模板不同角色"保证组内每个 Pod 的资源、镜像、挂载完全一致——它们跑的是同一段启动脚本，只是脚本里的编号不同。
+
+再强调一次边界：leader 是组内角色，不是"永远负责所有 GPU 计算"的算法规定。每个 Pod 都有一张卡、都在算；leader 只是额外多开了 API 端口。
+
+### StartupPolicy：为什么 leader 必须先在场
+
+worker 启动的第一件事是连 leader。如果没有任何顺序保证、worker 先起来了，失败是什么样子？分三层看：
+
+- **地址为空**：`LWS_LEADER_ADDRESS` 还没被注入或解析不出，本实验的哨兵 `test -n "$LWS_LEADER_ADDRESS"` 立刻失败退出，Pod 进入 CrashLoopBackOff。这是哨兵的价值：快速失败优于静默挂死。
+- **地址在、端口没人听**：leader 容器还在拉镜像或下载权重，master 端口 29500 无人监听。torchrun 与 vLLM 的会合连接反复超时重试，日志里是一串 connection refused，直到超时退出。ray 后端的版本同理：worker 连不上 head 节点，在重试里空转。
+- **最坏的形态**：不带哨兵、也不设超时的实现会无限等待。Pod 显示 Running、重启次数为零，但永远不 Ready——"活着但不工作"，比崩溃更难被发现。
+
+LWS 用 `spec.startupPolicy` 在控制器层解决创建顺序：
+
+| 取值 | 语义 |
+|---|---|
+| `LeaderCreated`（默认） | leader Pod 对象**创建后**即创建 worker——不保证 leader 已就绪、端口已监听 |
+| `LeaderReady` | leader 达到 Ready 才创建 worker，适合"worker 必须连上一个已就绪 leader"的框架 |
+
+注意 `LeaderCreated` 留下的窗口：leader 已存在、DNS 可解析，但还在启动中。本实验选它，然后在**应用层**补第二重保障——启动脚本先用 torchrun 跑一次小集合通信（见代码走读），torchrun 的会合自带重试，leader 晚几十秒上线也能接上。Pod 创建顺序由 startupPolicy 管，端口监听由应用层会合管，两层合起来才闭环。
+
+### 副本数与吞吐的账：线性区与饱和区
+
+组副本是最常被调的旋钮，先把"调它会怎样"算清楚。以下全部是**教学算例，非实测**，假设如下：
+
+- 每组 2 Pod、2 卡，PP=2；每请求 <Term id="tpot"/> 为 25 ms（口径沿用 serving 章），即单请求稳定产出 40 token/s；
+- 组内在途请求 ≤ 8 时 GPU 无争抢，TPOT 保持 25 ms；到 16 时恶化到 50 ms；
+- 每组并发上限 16 条（真实引擎由显存与配置决定，此处为假设）。
+
+服务共 2 组，按全服务在途请求数列表：
+
+| 在途请求 | 每组分摊 | 服务总吞吐 | 单请求 TPOT |
+|---|---|---|---|
+| 4 | 2 | 2 × (2 × 40) = 160 token/s | 25 ms |
+| 16 | 8 | 2 × (8 × 40) = 640 token/s | 25 ms（线性区尽头） |
+| 32 | 16 | 2 × (16 × 20) = 640 token/s | 50 ms（饱和） |
+| 48 | 16 + 排队 | 640 token/s | TPOT 不变，TTFT 持续上涨 |
+
+账要读出三层。**线性区**（在途 ≤ 16）：吞吐与在途请求数成正比，单请求延迟纹丝不动——这是扩容最划算的区间。**饱和区**（在途 16→32）：吞吐钉死在 2 × 320 = 640 token/s，多出来的并发只买到 TPOT 翻倍。**过载区**（在途 > 32）：新请求在网关排队，TTFT 开始无上限地涨，GPU 侧一切照旧——"变慢"的锅在排队，不在计算，这正是 serving 章五站分解在集群维度的重演。
+
+组副本翻倍时：饱和上限 640 → 1280 token/s，线性区宽度 16 → 32，**单请求延迟曲线不动**。一句话记住：`replicas` 买的是吞吐，不是速度。另一个不随副本共享的东西是前缀缓存：每组各有一份 KV 与缓存，同一个热点前缀每组都要存一遍——这笔重复账的机制在 <a href={asset('read/kv-reuse/')}>kv-reuse 章</a>。
+
+### 为什么不用 Deployment：与原生控制器的取舍
+
+"一组副本一起出现"这个需求，原生控制器离得有多远，一张表看清：
+
+| 需求 | Deployment | StatefulSet | LeaderWorkerSet |
+|---|---|---|---|
+| 副本身份 | Pod 名随机，无稳定序号 | 稳定序号与稳定网络名 | 组序号 + 组内角色，注入 `LWS_*` 变量 |
+| 启动顺序 | 并行创建，无保证 | 按序号有序（可配策略） | 组内 leader 先行（startupPolicy），组间并行 |
+| 扩缩单位 | 单 Pod | 单 Pod | **整组原子扩缩** |
+| 失败处理 | 重启该 Pod | 重启该 Pod（保身份） | 可配为整组重建 |
+| 一个"副本"是 | 一个 Pod | 一个 Pod | 一组协作 Pod |
+
+为什么不能用 Deployment 硬拼：其一，**没有稳定网络身份**——worker 无从得知 leader 在哪，`LWS_LEADER_ADDRESS` 这类注入也不存在；其二，**没有启动顺序**——滚动创建会让 worker 抢在 leader 之前起，落进上一节的三层失败场景；其三，**扩缩的轴是错的**——Deployment 加一个副本是加一个独立服务，而多机推理需要的是"加一个完整工作组"，用 Deployment 表达就得每次扩缩同时改副本数和引擎的 `--nnodes`，两个键没法原子地一起改。
+
+裸 StatefulSet 解决一半：有序号、有有序启动、有稳定 DNS，但一个 StatefulSet 是一份模板的扁平集合，表达不了"leader 带端口和探针、worker 带 headless"的同模板双角色。LWS 的做法正是"每组一个 StatefulSet"再包一层组语义——它不是发明新魔法，而是把训练/推理框架需要的组形状直接建出来。
+
+### 伸缩的坑：冷启动、整组删除与"陪葬"
+
+**扩容的账：新组从零开始。** 一个新组要经历拉镜像、下权重、建通信、加载与初始化。权重下载这一段在 <a href={asset('read/artifacts/')}>artifacts 章</a>算过：8 个副本各下载 4 GiB、源端有效吞吐 1 GiB/s，仅传输下界就是 32 秒——再叠加校验、加载与编译，真实几十上百 GiB 的模型冷启动是**分钟级**；而且多个组同时扩容共享同一条下载链路，洪峰只会更糟。本实验的 0.6B 模型很小，但清单已经按分钟级设计预算——代码走读里会看到 startupProbe 留的 15 分钟。
+
+**缩容的账：组是原子单位。** LWS 按组删除（从序号大的组开始），不会出现"砍掉 leader 留下 worker"的半组——半组在紧耦合模型里没有意义。但被删组上的在途请求会被掐断：正确顺序是先从网关摘掉该组的流量、按预算排空长生成（serving 章的排空口径），再缩容。Canary 发布同理，只能在完整可服务的组之间分流，不能向新旧权重混杂的 rank 随机发请求。
+
+**失败的账：一个 worker 死，全组陪葬。** 本实验配置 `RecreateGroupOnPodRestart`：组内任一 Pod 重启，整组重建。三个健康的 rank 连同它们的权重一起被丢弃，全组重走冷启动——这正是 frontmatter 那道题的答案：不能拿"还有进程活着"当健康证据，紧耦合组的可用性以组为单位。LWS 0.10.0 的 `restartPolicy` 还有 `None`（只重启故障 Pod）与 `RecreateGroupAfterStart`（组内已无 Pending 时才整组重建，保护大镜像拉取）两个取值，选择取决于框架能否支持成员重新加入。[LWS 失败处理](https://lws.sigs.k8s.io/docs/concepts/failure-handling/)
 
 <aside class="concept-note">
 <strong>关键边界：为什么无限重启不是自愈？</strong>
 
-如果每次都是相同的镜像错误、模型文件缺失或坏设备，重启只重复失败。可靠流程需要收集证据、限制重试、区分瞬时与持久故障，必要时隔离设备或回退版本。只有故障原因被消除且服务检查通过，才算恢复。
+如果每次都是相同的镜像错误、模型文件缺失或坏设备，重启只是重复失败。可靠流程需要收集证据、限制重试、区分瞬时与持久故障，必要时隔离设备或回退版本。对整组重建策略尤其如此：每次重建都是一次分钟级冷启动，无限重建等于用 GPU 账单循环购买同一个失败。只有故障原因被消除且服务检查通过，才算恢复。
 
 </aside>
 
-## 工作组与流量发布分别由谁控制
+## 代码走读：render-lws.py 输出的清单逐段
 
-LWS 管理工作组形态与生命周期；服务路由层决定哪些请求进入哪个可用版本。Canary 应在完整可服务的组之间分流，不能向新旧权重混杂的 rank 随机发请求。
+`labs/kubernetes/render-lws.py` 做一件事：把 pinned 的模型身份渲染成一份两节点、每节点一卡的 vLLM LWS 清单。先看入口再逐段拆输出。
 
-下线旧组之前先停止分配新请求，再按预算等待活动生成结束或取消，最后释放组与 KV。长生成会延长排空时间；强制终止则需要把失败计入服务质量。平台必须明确选择，而不是把 Pod 删除当成无损切换。
+### 入口：身份必须显式传入
 
-## 一个足够具体的故障练习
+脚本只有两个参数。`--model-revision` 必填，且必须通过 40 位十六进制的正则校验——防的是把短哈希或分支名当 revision 写进去；脚本不提供默认值，身份只能显式给。`--image` 默认 `vllm/vllm-openai:v0.29.0`，与 <a href={asset('read/serving/')}>serving 章</a>`prepare.py` 固化的镜像一致——同一个实验身份，贯穿单机与集群两条线。
 
-先运行两组并保留稳定请求流，记录每个组的身份和请求成功率；在实验环境让候选组的一个 worker 退出；检查组状态、其他 rank 日志、流量路由、重建次数和恢复时间。最后确认故障组资源被清理，健康组仍能完成请求。
+输出是一个 `v1 List`，四个对象各守一段：
 
-没有真实多节点环境时，可以推演这条状态链并审阅清单，但不能把它标成已运行。本库集群项目保留这一验证边界。
+| 对象 | 名字 | 作用 |
+|---|---|---|
+| Namespace | `inference-lws-lab` | 实验隔离 |
+| ConfigMap | `collective-preflight` | 内嵌 `labs/nccl/allreduce.py` 的**源码**——脚本运行时从仓库读取，不是复制品；改一处，下次渲染自动跟随 |
+| LeaderWorkerSet | `vllm-lab` | `replicas: 1`、`size: 2`、`startupPolicy: LeaderCreated`、`restartPolicy: RecreateGroupOnPodRestart` |
+| Service | `vllm-lab` | selector 打在 `role: leader` 上，端口 8000——**流量只进 leader**，worker 不收请求 |
 
-系统已经具备从制品到设备、工作组和路由的对象链。下一阶段用观测证据连接它们，解释请求慢在哪里、故障发生在哪一层。
+`replicas` 是 1 而不是 2，是实验规模的收敛：清单的机制在 1 组上已经完整，吞吐账里的 2 组只活在算例里。
+
+### 启动命令逐段：两节点共用同一条
+
+leader 与 worker 的 `command` 来自同一个字符串，五段各有含义：
+
+1. `set -eu` 加两个 `test -n` 哨兵——`LWS_LEADER_ADDRESS` 或 `LWS_WORKER_INDEX` 缺失立即退出。上一节"地址为空"的失败场景，在这里被主动拦截。
+2. `nvidia-smi`——设备可见性的第一现场。Pod 调度成功但没挂上 GPU 时，日志第一行就该是它（<Term id="dra"/> 章的分配账在容器里的兑现点）。
+3. torchrun 跑 `allreduce.py`——参数逐一来自注入变量：`--nnodes="$LWS_GROUP_SIZE"`、`--node-rank="$LWS_WORKER_INDEX"`、`--master-addr="$LWS_LEADER_ADDRESS"`，master 端口用 29501。
+4. `touch /tmp/preflight-passed`——这个文件就是 worker readinessProbe 检查的东西。探针与脚本之间的一份私有合同：**worker 的"就绪"被定义为"通过了一次真实的跨节点集合通信"**，而不是某个 HTTP 口径。
+5. `exec vllm serve ...`——`exec` 让 vLLM 取代 shell 成为容器主进程，信号与退出码不再隔一层；worker 版本在这条命令尾部追加 `--headless`。
+
+<Diagram id="preflight" caption="从本地配置到全组通信逐层检查。检查失败应留下证据，并设置有限的重试预算。" />
+
+<Term id="preflight" /> 的位置就在第 3、4 步之间：本地设备与配置（第 1、2 步）都对了，才轮到全组通信；小 AllReduce 用与真实负载相同的进程组形状跑一遍，通过才留标记。<Term id="nccl"/> 章算过 ring AllReduce 的流量账，这里的检查不测性能，只验证"全组能凑齐、能收发"。注意 29501 与第 5 步 vLLM 用的 29500 是**两个端口**：检查的会合与服务的会合互不抢道。本库的 preflight 脚本验证基础通信路径，不测完整模型性能；通过之后仍要执行模型加载、小请求和压力测试。
+
+### 环境变量与 vLLM 参数：逐个对应
+
+清单里出现的变量分两族——自己设的和 LWS 注入的：
+
+| 变量 | 谁写入 | 消费方 |
+|---|---|---|
+| `MODEL_REVISION` | 清单 `env`（40 位哈希） | vLLM `--revision`，下载时钉住仓库内容 |
+| `NCCL_DEBUG=INFO` | 清单 `env` | 让 NCCL 打出集合通信日志，排障用 |
+| `LWS_LEADER_ADDRESS` | LWS 控制器注入 | torchrun 与 vLLM 的 `--master-addr` |
+| `LWS_WORKER_INDEX` | LWS 注入 | `--node-rank` |
+| `LWS_GROUP_SIZE` | LWS 注入 | `--nnodes` |
+
+vLLM 启动参数按"回答什么问题"归类：
+
+| 参数 | 本清单值 | 回答什么 |
+|---|---|---|
+| `--tensor-parallel-size` | 1 | **TP**：节点内几张卡切分模型。每节点只有 1 卡，所以是 1 |
+| `--pipeline-parallel-size` | 2 | **PP**：模型按层切成几段分布到几个节点——两节点的协作由它实现（为什么跨机选 PP 不选 TP，账在 <a href={asset('read/model-parallel/')}>model-parallel 章</a>） |
+| `--served-model-name` | `lab-model` | **对外 served name**：请求里 `model` 字段填的是它，不是仓库名——与 serving 章单机服务同名 |
+| `--revision` | 40 位哈希 | 权重身份，与 `prepare.py` 固化的完全一致 |
+| `--max-model-len` | 2048 | 输入加输出总上限；单机实验是 4096，此处收紧 |
+| `--gpu-memory-utilization` | 0.8 | 划给引擎的显存比例，同 serving 章 |
+| `--distributed-executor-backend` | `mp` | 引擎用多进程后端组织分布式执行；生产多机常用 ray，此处钉成 mp，让会合点变成肉眼可见的 master-addr/master-port |
+| `--headless`（仅 worker） | — | worker 不起 API 服务：只算不接客 |
+
+### leader 与 worker 模板：差分就在三处
+
+同一份 `template()` 函数，`leader` 参数真假决定差异：
+
+| 项 | leader | worker |
+|---|---|---|
+| 端口 | 8000 | 无 |
+| startupProbe | httpGet `/health`，`periodSeconds: 10` × `failureThreshold: 90` | 无 |
+| readinessProbe | httpGet `/health`，每 5 秒 | exec `test -f /tmp/preflight-passed`，每 5 秒 |
+| 启动命令尾部 | 原样 | 追加 `--headless` |
+| 标签 `role` | `leader` | `worker` |
+
+startupProbe 的算术值得算一次：10 秒 × 90 次 = **15 分钟的启动预算**。权重下载、加载、图捕获都发生在第一个请求之前，慢启动不该被误判为故障；15 分钟内 `/health` 一直不通才按重启策略处理，通过之后交给 readinessProbe 接棒复查。机制章节说的"分钟级冷启动"，在清单上就是这两个数字。
+
+最后两处调度与资源细节。`podAntiAffinity` 用 `requiredDuringSchedulingIgnoredDuringExecution` 加 `topologyKey: kubernetes.io/hostname`：同一 LWS 的两个 Pod **必须**落在不同节点——"两节点各一卡"是调度器的硬保证，不是运气；代价是单节点集群上会直接 Pending。资源侧 `limits` 给 `nvidia.com/gpu: 1`、requests 给 2 CPU 与 8 Gi 内存；`shm` 卷是 2 Gi 的内存盘，对应单机 `serve.sh` 里的 `--shm-size 2g`——集合通信要靠它。
+
+## 动手：先预测，再渲染清单
+
+进入 Lab 之前做一道不花钱的预测题，检验的是吞吐账，不是背诵。
+
+**预测：** 机制章节的算例按 2 组（共 4 Pod、4 卡）算的。现在把 `spec.replicas` 从 2 改成 4，组大小仍是 2、每 Pod 仍是 1 卡、TP/PP 不动。问三件事：哪些资源量线性翻倍？哪些量纹丝不动？服务吞吐什么时候真的翻倍、什么时候只是看起来翻了？
+
+<details>
+<summary>对答案</summary>
+
+**线性翻倍**：Pod 数 4→8、GPU 4→8、CPU 与内存请求、权重下载总量（4×W→8×W）、KV 显存总量、线性区宽度（在途 16→32）、饱和吞吐上限 640→1280 token/s。
+
+**纹丝不动**：组内的一切——`size: 2`、TP=1/PP=2、单组吞吐上限 320 token/s、单请求 TPOT 的恶化曲线（25→50 ms）、每组冷启动时长；以及每 LWS 只有一份的东西——Pod 模板与 leader Service。副本数改的是"份数"，不改"定义"。
+
+**第三问**：只有当流量也翻倍、且网关与上游不在饱和区时，吞吐才真翻倍；流量不变，多出的两组整体闲置，GPU 账单照付。还有一层隐性代价：四组同时冷启动共享同一条下载链路（artifacts 章的洪峰账），全部就绪的时间可能比两组时更长——资源翻倍不等于更快就绪。
+
+</details>
+
+预测完去渲染。跑 Lab 命令拿到 JSON 后做四个核对：数一数 `items` 是不是四个对象；找到 `replicas` 与 `size`，确认"1 组 2 Pod"与你刚才的预测题口径差在哪；把 leaderTemplate 与 workerTemplate 肉眼 diff 一遍，差异应该只有表格里那几处；再故意传一个短哈希，看脚本拒绝你。在真实集群上 apply 属于项目五，本环境未运行——这层边界不越。
+
+至此，对象链从制品、设备、工作组到路由已经闭合：哪个 revision 的权重、跑在哪些 GPU 上、组成什么形状的组、流量从哪个 Pod 进。下一阶段用观测证据把这条链点亮——请求慢在哪一站、故障发生在哪一层，都要靠指标与日志回答，而不是靠"进程还活着"。
 
 <Lab lab="labs/kubernetes/render-lws.py" title="渲染 LeaderWorkerSet 清单" status="cpu-verified">
 
