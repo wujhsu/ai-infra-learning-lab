@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 单卡模型已经能计算和训练。如果让多张 GPU 协作，首要问题是：每个进程各自持有哪些数据，结束后又希望得到什么？先把这个问题说清楚，通信 API 才有意义。
 
@@ -80,3 +81,14 @@ Barrier 是同步点：参与者按规则到达后才能继续。它不是把所
 通信时间可以粗略分为每次操作的固定启动成本与随字节量增加的传输成本。小消息可能被启动和同步限制，大消息更容易体现带宽限制。
 
 把许多小梯度合成 bucket 可以减少调用开销，但也可能更晚才能开始通信。下一章先看数据必须经过哪些硬件路径，再研究什么时候值得重叠。
+
+<Lab lab="labs/nccl/allreduce.py" title="两卡 all-reduce 得到一致结果" status="gpu">
+
+两个进程各持有一份张量，all-reduce 之后每个进程都应得到相同的和。
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/nccl/allreduce.py
+```
+
+未运行（需要 GPU 与 NCCL 后端）。期望观察点：两进程打印的 reduction 结果一致；脚本内置了期望值断言。先在纸面推演每个进程各贡献什么，再运行对照。
+</Lab>

@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 我们先优化一个足够小、结果容易核对的表达式：`relu(2*x+1)`。relu 把负数变为零，非负数保持不变。它是数值加工，不涉及模型结构中的所有复杂性。
 
@@ -80,3 +81,15 @@ def fused(X, Y, N: tl.constexpr, BLOCK: tl.constexpr):
 先完成长度为 1000 的向量表达式，确保最后一个不满块的部分也正确。再增加大数组测试，观察优势是否变化。然后修改块大小，记录结果与硬件。
 
 当结果变慢时，回到启动次数、内存流量和资源占用，而不是直接归因于“编译器不好”。下一章把手工优化与框架编译联系起来。
+
+<Lab lab="labs/kernel/triton_add.py" title="写出并对比融合算子" status="gpu">
+
+从 `triton_add.py` 的逐元素加法开始，再到 `triton_fused.py` 的融合版本，比较访存量差异。
+
+```bash
+python labs/kernel/triton_add.py
+python labs/kernel/triton_fused.py
+```
+
+未运行（需要 CUDA）。期望观察点：融合版本少一次中间张量的全局内存往返；误差在浮点舍入量级。`optimizers.py` 同目录可对照 AdamW 的 single/foreach/fused 三种实现。
+</Lab>

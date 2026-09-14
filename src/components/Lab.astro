@@ -1,0 +1,13 @@
+---
+import {asset} from '../data/curriculum';
+const runs = import.meta.glob('../../docs/runs/*.json', {eager: true, import: 'default'}) as Record<string, any>;
+const badges: Record<string, string> = {'cpu-verified': 'CPU 已运行', 'cpu-client': '客户端已测 · 服务需 GPU', 'gpu': '需 GPU · 未运行', 'cluster': '需集群 · 未运行'};
+const {lab, title, status, evidence} = Astro.props as {lab: string; title: string; status: keyof typeof badges; evidence?: string};
+const run = evidence ? runs[`../../docs/runs/${evidence}`] : undefined;
+---
+<aside class="lab-card" data-lab-status={status}>
+  <header><span class="eyebrow">动手实验</span><h3>{title}</h3><span class="lab-badge">{badges[status]}</span></header>
+  <slot />
+  {run && <details class="lab-evidence"><summary>已运行的证据记录 · {run.date}</summary><pre><code>{JSON.stringify(run, null, 2)}</code></pre></details>}
+  <p class="lab-links"><a href={`https://github.com/wujhsu/ai-infra-learning-lab/blob/main/${lab}`} target="_blank" rel="noopener">源码 {lab} ↗</a><a href={asset('downloads/labs.zip')}>下载 labs.zip</a></p>
+</aside>

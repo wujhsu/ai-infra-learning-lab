@@ -25,6 +25,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 前四章都假定参数已经存在。你可能已经能解释模型如何生成，却还不知道这些数从哪里来。现在让模型犯一个可测量的小错误，然后用错误改变参数。
 
@@ -124,3 +125,14 @@ optimizer.step()                      # 按规则更新参数
 模型可能只记住训练样本，所以还要在没有参与更新的验证数据上观察表现。训练集、验证集与测试集的边界要在处理数据时明确，不能把几乎重复的段落随机分到两侧后就认为验证严格。
 
 这个章节的小例子可以精确手算。下一章把同样的“正向—损失—反向—更新”接到完整小模型，真正看见参数变化和生成结果。
+
+<Lab lab="labs/tiny_model/model.py" title="autograd 梯度对上有限差分" status="cpu-verified" evidence="tiny-model-cpu.json">
+
+运行机制测试中的梯度对照：对极小模型的每个参数，用有限差分手算一遍，再与反向传播的结果比较。两者对不上，说明"参数该往哪边改"的理解有错。
+
+```bash
+python -m unittest tests.test_tiny_model -v
+```
+
+预期：`test_gradient_matches_finite_difference` 通过；其余 4 项机制测试同时通过。
+</Lab>

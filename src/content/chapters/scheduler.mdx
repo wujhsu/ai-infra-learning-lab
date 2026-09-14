@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 我们已经能启动服务，也知道 KV 占多少资源。现在多个请求同时到来，系统必须决定谁先执行、每轮做多少工作、什么时候接纳新请求。这些选择决定用户感受到的速度。
 
@@ -82,3 +83,14 @@ N−1 是因为首 token 已包含在前面的阶段。这里假设后续耗时�
 客户端断开后，网关、服务层与引擎需要传递取消信号，清理仍在执行或等待的请求及资源。若只关闭网络连接，GPU 可能继续生成无人接收的内容。
 
 验收应包括：成功结束、长度上限、客户端取消、排队超时和执行错误。观察请求计数与 KV 使用是否回落，再判断生命周期管理是否正确。
+
+<Lab lab="labs/serving/cancel.py" title="观察取消之后发生什么" status="cpu-client">
+
+对推理服务发起一个流式请求，然后在半途断开连接。观察服务端的日志与显存：取消是否真的回收了 KV。
+
+```bash
+python labs/serving/cancel.py --url http://127.0.0.1:8000
+```
+
+客户端断开已可对任意端点练习；"断开后 KV 确实释放"需要 GPU 服务端验证，未运行。期望观察点：取消后显存回落、该会话的缓存块可被复用——这是项目四验收问题之一。
+</Lab>

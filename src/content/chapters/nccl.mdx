@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 现在我们知道通信算什么、数据走哪里。最后一个问题是时序：必须等所有数据到齐才能计算吗？哪些计算可以提前开始，而不会读到未完成的结果？
 
@@ -80,3 +81,14 @@ Device-initiated communication 等进阶接口进一步让设备端参与通信�
 只提高超时时间可能掩盖前两类错误。只增加 stream 也不会自动消除真实依赖。先恢复正确执行，再设计性能对照。
 
 项目中先做最小 AllReduce 正确性，再做同机/跨机基准，最后追踪模型中的重叠。每一步都有独立的失败定位范围。
+
+<Lab lab="labs/nccl/allreduce.py" title="通信与计算的重叠窗口" status="gpu">
+
+在 all-reduce 前后各排一段计算，用日志观察通信是否与计算重叠，还是串行等待。
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/nccl/allreduce.py
+```
+
+未运行（需要 GPU）。期望观察点：通信发起后进程不必立即等待——梯度分桶 ready 一块就 reduce 一块；观察哪段时间 GPU 在空转。源码阅读任务里有对应分析路径。
+</Lab>

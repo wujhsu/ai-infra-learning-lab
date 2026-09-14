@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 单机程序崩溃时，异常往往直接出现在当前终端。分布式作业中，真正失败的进程与最终报超时的进程可能不同。可靠恢复需要把所有参与者的状态放到同一条时间线上。
 
@@ -72,3 +73,14 @@ import {asset} from '../../data/curriculum';
 创建任务、准备环境、加载状态、运行、保存、失败、恢复与结束，是有明确转移条件的状态。后面 Kubernetes 与队列管理将承载这些动作，但不会自动替你定义正确的模型恢复语义。
 
 到这里，训练主线已经从一个参数更新，走到多设备上的一致计算与故障处理。下一阶段转向推理：参数通常固定，运行时主要面对不断到达、长度不同、可取消的用户请求。
+
+<Lab lab="labs/distributed/checkpoint_check.py" title="从中断处无损恢复" status="cpu-verified" evidence="dcp-cpu.json">
+
+恢复的正确性标准不只是"文件能加载"：恢复后接着走的下一步，必须与从未中断的连续训练一致。用本章命令复现这个判据。
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/distributed/checkpoint_check.py --directory /tmp/ai-infra-dcp-lab
+```
+
+预期：next_step_max_error 为 0。注意记录里声明的适用范围：固定数据、无 dropout、同一 world size。
+</Lab>

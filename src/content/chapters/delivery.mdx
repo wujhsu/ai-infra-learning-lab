@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 诊断发现新版本使用了不合适的调度配置，导致长输入挤压短请求。现在需要恢复服务，同时保留能解释问题的证据。一次可靠交付管理的是完整行为：权重、tokenizer、镜像、配置与路由共同决定用户拿到什么结果。
 
@@ -60,3 +61,14 @@ import {asset} from '../../data/curriculum';
 另一轮故意让指标源无数据，结果应是暂停或不确定，而不是成功放量。再做一次质量失败但 HTTP 正常的场景，确认评估门能拦住。配套 CPU 状态机测试只能验证决策逻辑；真实路由与集群演练仍需要实际执行。
 
 发布的最终报告应写清变更身份、比较条件、样本、判定、回滚用时及遗留问题。下一章把同样的证据意识用于容量与成本规划。
+
+<Lab lab="labs/rollouts/app.py" title="回滚决策的失败关死验证" status="cpu-verified">
+
+`app.py` 是一个可注入故障的 HTTP 假服务；`validate_decision.py` 对回滚决策做 fail-closed 校验。两者都在 CPU 上由测试覆盖。
+
+```bash
+python -m unittest tests.test_rollouts -v
+```
+
+预期：健康检查 200 而业务路径 500 时，`hold`/`rollback` 被接受、缺证据的 `propose_fix` 被拒绝——决策校验永远不执行修复，只放行有据可查的动作。
+</Lab>

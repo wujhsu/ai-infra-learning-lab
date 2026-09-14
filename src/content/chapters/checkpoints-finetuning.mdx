@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 小模型项目已经能保存并恢复。真实训练中，检查点还要跨进程、设备、文件和版本保持一致；微调则会进一步引入“原模型加适配器”的组合关系。本章把这些对象接成一条明确的交付链。
 
@@ -81,3 +82,26 @@ B：初始化 → N 步 → 保存 → 加载 → M 步 → 结果 B
 ## 练习：设计一份最小交付清单
 
 给另一个工程师一份模型时，至少说明模型与分词器版本、适配器关系、训练数据版本、目标任务、评估方法、运行环境和已知限制。让对方能重建同样的组合，是模型制品管理的起点。
+
+<Lab lab="labs/tiny_model/train.py" title="保存、恢复并继续训练" status="cpu-verified" evidence="tiny-model-cpu.json">
+
+先用 100 步训到一个检查点，再用 `--resume` 从检查点继续。恢复后的下一步更新，必须与不中断连续训练完全一致。
+
+```bash
+python labs/tiny_model/train.py --steps 100 --output /tmp/tiny.pt
+python labs/tiny_model/train.py --steps 120 --resume /tmp/tiny.pt --output /tmp/tiny.pt
+```
+
+预期：`test_checkpoint_resume_preserves_next_updates` 通过；恢复后继续训练不重置优化器状态。
+</Lab>
+
+<Lab lab="labs/single_training/lora.py" title="在真实模型上做 LoRA 微调" status="gpu">
+
+把同一套保存/恢复理解搬到 Qwen3-0.6B：冻结基座权重，只训练低秩适配器。脚本在无 CUDA 的机器上会直接退出。
+
+```bash
+python labs/single_training/lora.py
+```
+
+未运行（本工作站无 GPU）。期望观察点：适配器文件远小于基座；合并适配器前后，输出对同一提示应有可见差异；从适配器无法恢复完整训练轨迹。
+</Lab>

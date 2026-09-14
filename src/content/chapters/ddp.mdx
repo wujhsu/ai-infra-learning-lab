@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 两张 GPU 各训练一份模型，结束后简单挑一份参数，并不自动等于“训练速度翻倍”。要让它们共同完成同一个训练目标，必须定义数据如何分配、梯度如何合并，以及参数什么时候更新。
 
@@ -76,3 +77,14 @@ torchrun --standalone --nproc-per-node=2 labs/distributed/ddp_check.py
 通信、数据加载、调度不均、重复同步和每卡微批次太小都可能限制扩展。如果总批次固定，增加卡数会减少每卡工作，通信占比可能上升；如果每卡批次固定，总批次变大，又需要重新考虑训练目标和收敛。
 
 报告吞吐时同时记录批次策略与质量指标。训练得更快但需要更多步才能达到目标，也不一定降低总成本。
+
+<Lab lab="labs/distributed/ddp_check.py" title="两份模型学成同一份参数" status="cpu-verified" evidence="ddp-cpu.json">
+
+用 torchrun 起两个进程（CPU 上走 Gloo 后端），比较"单进程全局批次一步更新"与"DDP 各自分片一步更新"的参数。
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/distributed/ddp_check.py
+```
+
+预期：两种路径的最大参数误差在浮点舍入量级（实测 1.49e-08）。CI 在每次部署前都会运行这条命令。
+</Lab>

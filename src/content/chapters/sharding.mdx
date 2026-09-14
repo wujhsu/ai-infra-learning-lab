@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 DDP 的每个 rank 都保留完整训练状态。如果一份状态已经超过单卡容量，复制更多份并不能解决。现在让不同 rank 分别负责一部分状态。
 
@@ -76,3 +77,25 @@ FSDP2 的接口采用可组合的模块分片方式。阅读教程时要区分 F
 恢复到不同 world size 可能要求重新分布状态，支持范围由具体 API 与格式决定。不要假定“文件扩展名相同”就能任意跨框架、跨并行策略加载。
 
 项目保留一条小规模 FSDP2 运行路线，并要求比较训练前后结果、峰值显存和通信。GPU 实测状态单独记录；这里的数组例子只验证数据关系。
+
+<Lab lab="labs/distributed/checkpoint_check.py" title="分片状态的保存与重聚" status="cpu-verified" evidence="dcp-cpu.json">
+
+用分布式检查点（DCP）在两个进程间保存分片状态，再恢复并各走一步训练，与不中断的连续训练比较。
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/distributed/checkpoint_check.py --directory /tmp/ai-infra-dcp-lab
+```
+
+预期：恢复后的下一步误差为 0（固定数据、无 dropout、同一 world size）。CI 亦运行此命令。
+</Lab>
+
+<Lab lab="labs/distributed/fsdp_train.py" title="FSDP2 分片训练" status="gpu">
+
+把参数、梯度与优化器状态分片到多卡，观察每卡显存占用与all-gather 重聚时机。需要至少 2 张 GPU。
+
+```bash
+torchrun --standalone --nproc-per-node=2 labs/distributed/fsdp_train.py
+```
+
+未运行（需要 GPU）。期望观察点：分片后单卡显存约为整模型的 1/world_size 加临时重聚缓冲；前向到某层时该层参数完成重聚。
+</Lab>

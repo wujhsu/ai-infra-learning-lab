@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 上一章手动合并了几个算子。真实模型有许多算子，编译系统尝试分析整段计算，再生成更适合设备执行的实现。你需要理解它看见了什么，以及哪些工作仍留在 Python 或运行时。
 
@@ -78,3 +79,14 @@ python labs/kernel/benchmark.py
 训练还包含反向与优化器；推理有队列、KV 管理和动态请求生命周期。编译某个模型函数，并不会自动优化所有周边系统。
 
 因此源码阅读会从实际热点入口出发，追踪哪些段被捕获、生成代码落在哪里、运行时又做了什么。你不必先写一个编译器，但应该能解释一次改动影响了哪一段执行。
+
+<Lab lab="labs/kernel/benchmark.py" title="torch.compile 改变了什么" status="gpu">
+
+对同一模型分别用 eager 与编译模式计时，观察首次编译成本与稳态收益。
+
+```bash
+python labs/kernel/benchmark.py
+```
+
+未运行（需要 CUDA）。期望观察点：首次运行包含编译时间、明显更慢；固定输入形状后稳态运行更快；改变输入形状可能触发重编译。
+</Lab>

@@ -49,6 +49,8 @@ for(const col of collections){const files=walk('src/content/'+col).filter(p=>p.e
   for(const id of field('requires')){const c=concepts.find(x=>x.id===id);assert(c,`${file}: missing concept ${id}`);if(col==='chapters')assert(reading.find(x=>x.id===c.firstChapter).order<reading.find(x=>x.id===path.basename(file,'.mdx')).order,`${file}: forward prerequisite ${id}`);}
   for(const m of content.matchAll(/<Demo type="([^"]+)"/g))assert(['latency','kv','batch','cache','overlap','dra'].includes(m[1]),'Unknown demo');
   assert(!content.includes('<Demo kind='),'Incorrect demo prop');
+  for(const m of content.matchAll(/<Lab\s+[^>]*lab="([^"]+)"[^>]*status="([^"]+)"/g)){assert(existsSync(m[1]),`${file}: lab path missing ${m[1]}`);assert(['cpu-verified','cpu-client','gpu','cluster'].includes(m[2]),`${file}: unknown lab status ${m[2]}`);}
+  for(const m of content.matchAll(/<Lab\s+[^>]*evidence="([^"]+)"/g))assert(existsSync(`docs/runs/${m[1]}`),`${file}: evidence missing ${m[1]}`);
   assert(content.includes('question:')&&content.includes('answer:'),`${file}: missing self check`);
   if(col==='chapters'){const proj=content.match(/^project: "?([a-z0-9-]+)"?$/m)?.[1];assert(proj,`${file}: missing project`);assert.equal(chapterProject.get(path.basename(file,'.mdx')),proj,`${file}: frontmatter project does not match projects.json`);}
  }

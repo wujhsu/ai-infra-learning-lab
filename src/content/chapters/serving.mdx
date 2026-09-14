@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 训练得到的是模型状态，用户需要的是一个持续运行的服务。服务要加载模型、接受请求、分配计算资源、产生输出并处理结束或失败。现在把第一章的生成循环放到一个真实引擎中。
 
@@ -89,3 +90,15 @@ python labs/serving/measure_stream.py --requests 20 --concurrency 1 --output /tm
 连接失败先检查监听与进程；模型名称错误先看服务列表；设备或加载错误看启动日志；长输入失败核对实际 token 数与配置上限；请求一直等待则需要区分队列与模型执行。
 
 不要同时更换模型、镜像、精度和并发。保留能够成功的一条基线，再逐项改变。下一章先算清 KV 如何消耗和复用显存，之后再观察调度为什么决定延迟。
+
+<Lab lab="labs/serving/measure_stream.py" title="测量流式输出的时间线" status="cpu-client">
+
+先用 `prepare.py` 固化模型 revision 与镜像身份，起服务后用流式客户端测量首块与总时长。客户端本身只用标准库，可先对任意 OpenAI 兼容端点练习。
+
+```bash
+python labs/serving/prepare.py
+python labs/serving/measure_stream.py --url http://127.0.0.1:8000 --requests 20 --concurrency 4 --max-tokens 64
+```
+
+服务本体需要 GPU 与 Docker（`serve.sh`），未在本环境运行。客户端解析逻辑由 `tests/test_stream.py` 在本地假 SSE 服务上验证过：块数不等于 token 数、截断流与错误路径都能正确报告。
+</Lab>

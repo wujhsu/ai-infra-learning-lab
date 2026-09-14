@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 上一章，我们让每个位置根据自己的 Q 读取允许访问的 K/V。现在回到第一章的循环：已经根据“北京是中国的”选出“首都”，下一步还想生成句号。
 
@@ -128,3 +129,14 @@ new_output = attention(q_new, K, V)
 第二个反例：缓存正确，但把长上下文下的慢响应全部归因于“没有命中”。即使命中，历史数据读取也有代价，队列和其他工作还可能占时间。
 
 这两类错误分别是正确性问题和性能归因问题。AI Infra 的优化通常需要同时检查二者。
+
+<Lab lab="labs/tiny_model/model.py" title="缓存增量必须与全量前向一致" status="cpu-verified" evidence="tiny-model-cpu.json">
+
+运行机制测试，其中两项直接对应本章：带缓存的逐步前向必须与全量前向逐位一致；把未来 token 接在后面，不得改变已有前缀的结果。
+
+```bash
+python -m unittest tests.test_tiny_model -v
+```
+
+预期：5 项机制测试全部通过（缓存一致性、前缀不变性、梯度、检查点恢复、训练收敛）。真实运行记录见下方证据。
+</Lab>

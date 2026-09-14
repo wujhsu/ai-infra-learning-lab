@@ -24,6 +24,7 @@ import Demo from '../../components/Demo';
 import Slide from '../../components/Slide.astro';
 import Diagram from '../../components/Diagram.astro';
 import {asset} from '../../data/curriculum';
+import Lab from '../../components/Lab.astro';
 
 现在已经有了两条完整的计算线：生成时，根据已有内容选下一项；训练时，根据目标计算损失，再用梯度更新参数。本章把它们放进同一个程序。
 
@@ -118,3 +119,14 @@ python labs/tiny_model/train.py --resume /tmp/tiny-checkpoint.pt --steps 120 --o
 这些测试各回答一个独立问题。缓存生成相同只检查最终选择，logits 对比还能发现尚未改变最高分位置的细微错误。恢复后能加载只检查文件格式，继续更新一致才能验证优化器和状态是否恢复正确。
 
 完成这些检查后，你已经把第一章的黑箱打开为一条可实现的计算路径。下一阶段把数据放到真实设备上，解释为什么同样正确的计算可能有完全不同的时间与空间代价。
+
+<Lab lab="labs/tiny_model/train.py" title="亲手跑一个训练循环" status="cpu-verified" evidence="tiny-model-cpu.json">
+
+在 CPU 上把 7 token 的两层模型对一句教学文本过拟合 100 步，观察损失下降与生成变化。
+
+```bash
+python labs/tiny_model/train.py --steps 100 --output /tmp/ai-infra-tiny-checkpoint.pt
+```
+
+预期：损失从 2.5986 降到 0.00087 量级，生成的续写与目标一致。真实运行数字见下方证据记录。
+</Lab>
