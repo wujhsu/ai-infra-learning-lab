@@ -1,63 +1,85 @@
-[
+{
+ "date": "2026-09-14",
+ "scope": "post-rewrite deployment probe",
+ "results": [
   {
-    "path": "",
-    "status": 200,
-    "bytes": 54595
+   "path": "/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "read/generation/",
-    "status": 200,
-    "bytes": 66105
+   "path": "read/generation/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "read/attention/",
-    "status": 200,
-    "bytes": 69207
+   "path": "read/gpu-memory/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "read/dra/",
-    "status": 200,
-    "bytes": 65341
+   "path": "read/collectives/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "projects/tiny-model/",
-    "status": 200,
-    "bytes": 56230
+   "path": "read/serving/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "code/vllm-request/",
-    "status": 200,
-    "bytes": 51688
+   "path": "read/artifacts/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "pagefind/pagefind.js",
-    "status": 200,
-    "bytes": 45555
+   "path": "projects/tiny-model/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "images/gpu-data-movement.webp",
-    "status": 200,
-    "bytes": 122724
+   "path": "code/vllm-request/",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "downloads/labs.zip",
-    "status": 200,
-    "bytes": 26771
+   "path": "pagefind/pagefind.js",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "learn/01-request/",
-    "status": 404
+   "path": "downloads/labs.zip",
+   "status": 200,
+   "expected": 200,
+   "ok": true
   },
   {
-    "path": "labs/01-serving/",
-    "status": 404
+   "path": "learn/",
+   "status": 404,
+   "expected": 404,
+   "ok": true
   },
   {
-    "path": "topics/01-kernelagent/",
-    "status": 404
+   "path": "labs/01-serving/",
+   "status": 404,
+   "expected": 404,
+   "ok": true
   },
   {
-    "path": "foundations/",
-    "status": 404
+   "path": "topics/",
+   "status": 404,
+   "expected": 404,
+   "ok": true
   }
-]
+ ],
+ "all_ok": true
+}
